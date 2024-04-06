@@ -225,8 +225,7 @@ def get_story(user_prompt: str, context_documents: List[Document]):
     chain = LLMChain(llm=llm, prompt=final_prompt)
     question = chain.invoke({"user": user_prompt, "documents": context_documents})
     return question["text"]
-    # print("done")
-    # return extract_json(question["text"])
+
 
 
 def return_ner_tokens(text: str):
@@ -347,7 +346,7 @@ def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Docume
 
 
 # indexs = ["air_force_one", "airforce_delta_strike","women_airforce_service_pilots","finnish_air_force"]
-prompt = "what happed to jfsks' brain after he was assasinted"
+prompt = "What happedned to JFK's brain after he was assasinated?"
 
 # print(return_documents(prompt, index_names=indexs))
 
@@ -366,7 +365,7 @@ documents = return_documents(
 )
 # # print(documents)
 
-get_story(user_prompt=prompt, context_documents=documents)
+print(get_story(user_prompt=prompt, context_documents=documents))
 
 # print(
 #     convert_user_input_to_question(
