@@ -1,4 +1,4 @@
-Using the provided document, craft a story that begins with  attention-grabbing question "Did you know?".
+Using the provided document, craft a story that begins with an attention-grabbing question that starts with "Did you know?".
 Stick closely to the documents provided to generate your output.
 Brief excerpt references are allowed for context, but the majority must concisely summarize relevant facts from the documents in your own words.
 Do not generate words or stories what are not from the document, your output must, must be and strictly related to the documents, provided
