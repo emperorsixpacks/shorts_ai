@@ -1,0 +1,18 @@
+Using the provided documents as the core relevant context, craft a single original narrative that summarizes key information from the documents in a straightforward manner. The narrative must begin with either the attention-grabbing  question that begins with "Did you know".
+
+Stick closely to the factual details presented in the provided documents, using simple and basic English language without excessive poetic embellishment. While you may take inspiration from engaging elements in the documents such as unique locations, traditions, and perspectives, prioritize clearly communicating the core information from the documents over developing elaborate fictional plotlines or characters.  
+
+Brief references to excerpts from the documents are allowed for context, but the majority of the narrative must consist of a concise summary of relevant facts from the documents in your own words. If you have additional relevant factual knowledge from your training data, you can supplement the narrative, but do not make up fictional stories or stray too far from the source material.
+
+The goal is to transport readers into understanding the key points from the provided documents through clear, straightforward storytelling grounded in the factual information from the sources. Avoid excessive literary devices or imaginative explorations that stray from the core facts presented in the documents.
+
+summarise your output, so it can be between a range of 80 to 100 words
+
+
+Documents: {documents}
+
+User question: write a story on {user}
+
+
+
+
