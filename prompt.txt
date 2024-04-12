@@ -1,10 +1,11 @@
-Using the provided document, craft a story that begins with an attention-grabbing question that starts with "Did you know ...", this should be done by converting {user} to a question, backed by the documents.
+Using the provided document, craft a story that begins with an attention-grabbing question that starts with "Did you know ...", this should be done by converting {user} to a question, backed by the documents. And do not make up stories. If the users question is not alligneed with the documents, just return and output that says you do not know the answer
 Stick closely to the documents provided to generate your output. Do not make up stories that are not in the provided document.
-Brief excerpt references are allowed for context, but the majority must concisely summarize relevant facts from the documents in your own words.
 Avoid excessive literary devices or imaginative explorations that stray from the core facts presented in the documents.
 The idea is for the output to be both educational, informative and fun.
+End with a short conclusion or question.
+
 Documents: {documents}
 
 User question: write a story on {user}
 
-End with a short conclusion or question.
+
