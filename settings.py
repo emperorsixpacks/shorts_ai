@@ -14,7 +14,7 @@ class BaseConfig(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=(".env.prod", ".env"), env_file_encoding="utf-8", extra="ignore"
     )
 
 
@@ -81,7 +81,7 @@ class LLMsettings(BaseConfig):
     deepinfra_api_key: str = None
 
 
-class TexttoSpeechsettings(BaseConfig):
+class TxtSpeechsettings(BaseConfig):
     """
     Settings for IBM Watson Text to Speech API credentials.
 
@@ -92,3 +92,4 @@ class TexttoSpeechsettings(BaseConfig):
 
     ibm_api_key: str = None
     ibm_url: str = None
+    ibm_service_name: str = None
