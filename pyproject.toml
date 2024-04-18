@@ -22,6 +22,7 @@ google-generativeai = "^0.4.1"
 langchain-anthropic = "^0.1.6"
 ibm-watson = "^8.0.0"
 pydantic-settings = "^2.2.1"
+boto3 = "^1.34.87"
 
 
 [build-system]
