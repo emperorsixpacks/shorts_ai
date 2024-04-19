@@ -2,14 +2,14 @@ import re
 import random
 from typing import List
 from dataclasses import dataclass
-import requests
 from functools import lru_cache
 from enum import StrEnum
 
+import requests
 import wikipediaapi
 import praw
 from ffmpeg import FFmpeg
-import boto
+import boto3
 from botocore.exceptions import NoCredentialsError
 
 from huggingface_hub import InferenceClient
@@ -35,7 +35,7 @@ from settings import (
     TxtSpeechsettings,
     LLMsettings,
     HuggingFaceHubSettings,
-    AWSSettings
+    AWSSettings,
 )
 
 reddit_settings = RedditSettings()
@@ -44,12 +44,13 @@ embeddings_settings = EmbeddingSettings()
 txt_speech_settings = TxtSpeechsettings()
 llm_settings = LLMsettings()
 hf_hub_settings = HuggingFaceHubSettings()
-aws_settings =  AWSSettings()
+aws_settings = AWSSettings()
 
-
+WIKI_API_SEARCH_URL = "https://en.wikipedia.org/w/rest.php/v1/search/page?q={}&limit=4"
 redis_url = f"redis://{redis_settings.redis_host}:{redis_settings.redis_port}"
 wiki_wiki = wikipediaapi.Wikipedia("MyProjectName (merlin@example.com)", "en")
 ner_model = InferenceClient(token=hf_hub_settings.HuggingFacehub_api_token)
+
 
 @lru_cache
 def load_embeddings_model():
@@ -58,16 +59,19 @@ def load_embeddings_model():
     """
     return HuggingFaceBgeEmbeddings(model_name=embeddings_settings.embedding_model)
 
+
 embeddings = load_embeddings_model()
+
 
 class SupportedMediaFileType(StrEnum):
     """
     Supported media file types for downloading and converting
     """
-    MP4 = "mp4"
-    WAV = "wav"
 
-    
+    MP4 = ".mp4"
+    WAV = ".wav"
+
+
 @dataclass
 class BaseMedia:
     """
@@ -79,12 +83,12 @@ class BaseMedia:
     duration: duration of the media file in seconds
     file_type: file type of the media file (e.g. "mp4", "wav")
     """
+
     location: str
     name: str
     size: int
     duration: int
     file_type: SupportedMediaFileType
-
 
 
 @dataclass
@@ -95,6 +99,7 @@ class WikiPage:
     page_title: title of the Wikipedia page (in lower case)
     text: text content of the Wikipedia page
     """
+
     page_title: str
     text: str
 
@@ -107,20 +112,17 @@ class WikiPage:
 
 @dataclass
 class Audio(BaseMedia):
-    
     def __str__(self) -> str:
-        return f"audio_{self.name}"
+        return f"audio_{self.name}.{self.file_type}"
 
 
 @dataclass
 class Video(BaseMedia):
-    
-    
     def __str__(self) -> str:
-        return f"video_{self.name}"
+        return f"video_{self.name}.{self.file_type}"
 
 
-def generate_presigned_url(object_key:str, expiration:int=3600):
+def generate_presigned_url(object_key: str, expiration: int = 3600):
     """
     Generates a presigned URL for uploading an object to an S3 bucket.
 
@@ -132,18 +134,22 @@ def generate_presigned_url(object_key:str, expiration:int=3600):
         str: The generated presigned URL for uploading the object.
         None: If the AWS credentials are not available.
     """
-    aws_s3_client = boto.connect_s3(aws_access_key_id=aws_settings.aws_access_key, aws_secret_access_key=aws_settings.aws_secret_key)
+    aws_client = boto3.client(
+        "s3",
+        aws_access_key_id=aws_settings.aws_access_key,
+        aws_secret_access_key=aws_settings.aws_secret_key,
+    )
     try:
-        url = aws_s3_client.generate_url(
-            expires_in=expiration,
-            bucket=aws_settings.s3_bucket,
-            key=object_key,
-            method="put_object",
+        url = aws_client.generate_presigned_url(
+            "put_object",
+            Params={"Bucket": aws_settings.s3_bucket, "Key": object_key},
+            ExpiresIn=expiration,
         )
         return url
     except NoCredentialsError:
         print("Credentials not available")
         return None
+
 
 def upload_file_to_s3(url, file_content):
     """
@@ -157,18 +163,15 @@ def upload_file_to_s3(url, file_content):
     None
     """
     response = requests.put(url, data=file_content, timeout=60)
-    
-    try:
-        # Check if the upload was successful
-        if response.status_code == 200:
-            print("File uploaded successfully.")
-        else:
-            print(f"Failed to upload file. Status code: {response.status_code}")
-            print(response.content)
 
-    except Exception as e:
-        print(f"Error uploading file: {e}")
-        
+    # Check if the upload was successful
+    if response.status_code == 200:
+        print("File uploaded successfully.")
+    else:
+        print(f"Failed to upload file. Status code: {response.status_code}")
+        print(response.content)
+
+
 def get_videos_from_subreddit():
     """
     Get videos from a specific subreddit using the PRAW library.
@@ -233,37 +236,37 @@ def convert_video(video_file: str, audio_file: str):
 
 
 def convert_text_to_audio(text: str):
-    
     """
     Converts the given text to audio using the IBM Watson Text to Speech service.
-    
+
     Args:
         text (str): The text to be converted to audio.
-        
+
     Returns:
         None
-        
+
     Raises:
         None
     """
     authenticator = IAMAuthenticator(apikey=txt_speech_settings.ibm_api_key)
 
-
     txt_speech = TextToSpeechV1(authenticator=authenticator)
     txt_speech.set_service_url(service_url=txt_speech_settings.ibm_url)
-    
-    with open("speaker_text.wav", "wb") as wav_file:
-        # Read binary data from the WAV file
-        wav_file.write(
-            txt_speech.synthesize(
-                text,
-                accept="audio/wav",
-                voice="en-US_HenryV3Voice",
-                pitch_percentage=25,
-            )
-            .get_result()
-            .content
+    url = generate_presigned_url(object_key="hello_world.wav")
+    print(url)
+    # with open("hello.wav", "wb") as wav_file:
+    # Read binary data from the WAV file
+    upload_file_to_s3(
+        url=url,
+        file_content=txt_speech.synthesize(
+            text,
+            accept="audio/wav",
+            voice="en-US_HenryV3Voice",
+            pitch_percentage=25,
         )
+        .get_result()
+        .content,
+    )
 
 
 def open_prompt_txt(file: str) -> str:
@@ -272,7 +275,6 @@ def open_prompt_txt(file: str) -> str:
     """
     with open(file, "r", encoding="utf-8") as f:
         return f.read()
-
 
 
 def extract_answer(llm_output):
@@ -470,9 +472,19 @@ def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Docume
     ]
 
 
-prompt = "Write on how JFK's father actuallly wanted his brother to become president and not him"
+# def main():
+#     prompt = "Write on how JFK's father actuallly wanted his brother to become president and not him"
+#     documents = return_documents(
+#         prompt,
+#         index_names=[
+#             "john_f._kennedy",
+#             "assassination_of_john_f._kennedy",
+#             "jfk_(film)",
+#         ],
+#     )
+#     story = get_story(user_prompt=prompt, context_documents=documents)
+#     audio = convert_text_to_audio(text=story)
 
-# print(return_documents(prompt, index_names=indexs))
 
 # tokens = return_ner_tokens(prompt)
 # print(tokens)
@@ -483,17 +495,12 @@ prompt = "Write on how JFK's father actuallly wanted his brother to become presi
 # chunk_and_save(contents)
 
 # #
-# documents = return_documents(
-#     prompt,
-#     index_names=["john_f._kennedy", "assassination_of_john_f._kennedy", "jfk_(film)"],
-# )
+
 
 # # print(documents)
 
 # print(check_user_prompt(text=prompt, valid_documents=documents))
 # # print(documents)
 
-# print(get_story(user_prompt=prompt, context_documents=documentsa))
-
-
-print(generate_presigned_url("hello.txt"))
+# print(convert_text_to_audio("he"))
+print(convert_text_to_audio(text="hello"))
