@@ -1,12 +1,16 @@
 import re
 import random
 from typing import List
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import requests
+from functools import lru_cache
+from enum import StrEnum
+
 import wikipediaapi
 import praw
-from dotenv import load_dotenv
 from ffmpeg import FFmpeg
+import boto
+from botocore.exceptions import NoCredentialsError
 
 from huggingface_hub import InferenceClient
 
@@ -14,7 +18,7 @@ from langchain_community.llms.ai21 import AI21, AI21PenaltyData
 from langchain_community.chat_models.deepinfra import ChatDeepInfra
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from langchain.chains import LLMChain
+from langchain.chains.llm import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -31,6 +35,7 @@ from settings import (
     TxtSpeechsettings,
     LLMsettings,
     HuggingFaceHubSettings,
+    AWSSettings
 )
 
 reddit_settings = RedditSettings()
@@ -39,41 +44,57 @@ embeddings_settings = EmbeddingSettings()
 txt_speech_settings = TxtSpeechsettings()
 llm_settings = LLMsettings()
 hf_hub_settings = HuggingFaceHubSettings()
+aws_settings =  AWSSettings()
 
 
-WIKI_API_SEARCH_URL = "https://en.wikipedia.org/w/rest.php/v1/search/page?q={}&limit=4"
-REDIS_PORT = os.getenv("REDIS_PORT")
-REDIS_HOST = os.getenv("REDIS_HOST")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
-TEXT_TO_QUESTION_MODEL = os.getenv("TEXT_TO_QUESTION_MODEL")
-AI21_API_KEY = os.getenv("AI21_API_KEY")
-DEEPINFRA_API_KEY = os.getenv("DEEPINFRA_API_KEY")
-
-redis_url = f"redis://{REDIS_HOST}:{REDIS_PORT}"
-
-
+redis_url = f"redis://{redis_settings.redis_host}:{redis_settings.redis_port}"
 wiki_wiki = wikipediaapi.Wikipedia("MyProjectName (merlin@example.com)", "en")
 ner_model = InferenceClient(token=hf_hub_settings.HuggingFacehub_api_token)
-embeddings = HuggingFaceBgeEmbeddings(model_name=embeddings_settings.embedding_model)
 
+@lru_cache
+def load_embeddings_model():
+    """
+    A description of the entire function, its parameters, and its return types.
+    """
+    return HuggingFaceBgeEmbeddings(model_name=embeddings_settings.embedding_model)
 
+embeddings = load_embeddings_model()
+
+class SupportedMediaFileType(StrEnum):
+    """
+    Supported media file types for downloading and converting
+    """
+    MP4 = "mp4"
+    WAV = "wav"
+
+    
 @dataclass
-class Media:
+class BaseMedia:
+    """
+    Dataclass for storing metadata about a media file
+
+    location: file location on disk
+    name: name of the file
+    size: size of the file in bytes
+    duration: duration of the media file in seconds
+    file_type: file type of the media file (e.g. "mp4", "wav")
+    """
     location: str
-    name: str = field(init=False)
-    file_format: str = field(init=False)
-    size: int = field(init=False)
-    duration: int = field(init=False)
+    name: str
+    size: int
+    duration: int
+    file_type: SupportedMediaFileType
 
-    def __post__init__(self):
-        pass
-
-    def get_file_info(self):
-        pass
 
 
 @dataclass
 class WikiPage:
+    """
+    Dataclass for storing metadata about a Wikipedia page
+
+    page_title: title of the Wikipedia page (in lower case)
+    text: text content of the Wikipedia page
+    """
     page_title: str
     text: str
 
@@ -85,15 +106,69 @@ class WikiPage:
 
 
 @dataclass
-class Audio(Media):
-    pass
+class Audio(BaseMedia):
+    
+    def __str__(self) -> str:
+        return f"audio_{self.name}"
 
 
 @dataclass
-class Video(Media):
-    pass
+class Video(BaseMedia):
+    
+    
+    def __str__(self) -> str:
+        return f"video_{self.name}"
 
 
+def generate_presigned_url(object_key:str, expiration:int=3600):
+    """
+    Generates a presigned URL for uploading an object to an S3 bucket.
+
+    Parameters:
+        object_key (str): The key of the object to be uploaded.
+        expiration (int, optional): The expiration time of the presigned URL in seconds. Defaults to 3600.
+
+    Returns:
+        str: The generated presigned URL for uploading the object.
+        None: If the AWS credentials are not available.
+    """
+    aws_s3_client = boto.connect_s3(aws_access_key_id=aws_settings.aws_access_key, aws_secret_access_key=aws_settings.aws_secret_key)
+    try:
+        url = aws_s3_client.generate_url(
+            expires_in=expiration,
+            bucket=aws_settings.s3_bucket,
+            key=object_key,
+            method="put_object",
+        )
+        return url
+    except NoCredentialsError:
+        print("Credentials not available")
+        return None
+
+def upload_file_to_s3(url, file_content):
+    """
+    Uploads file content to a specified S3 URL using PUT request.
+
+    Parameters:
+    url (str): The S3 URL to upload the file to.
+    file_content (bytes): The content of the file to upload.
+
+    Returns:
+    None
+    """
+    response = requests.put(url, data=file_content, timeout=60)
+    
+    try:
+        # Check if the upload was successful
+        if response.status_code == 200:
+            print("File uploaded successfully.")
+        else:
+            print(f"Failed to upload file. Status code: {response.status_code}")
+            print(response.content)
+
+    except Exception as e:
+        print(f"Error uploading file: {e}")
+        
 def get_videos_from_subreddit():
     """
     Get videos from a specific subreddit using the PRAW library.
@@ -159,6 +234,18 @@ def convert_video(video_file: str, audio_file: str):
 
 def convert_text_to_audio(text: str):
     
+    """
+    Converts the given text to audio using the IBM Watson Text to Speech service.
+    
+    Args:
+        text (str): The text to be converted to audio.
+        
+    Returns:
+        None
+        
+    Raises:
+        None
+    """
     authenticator = IAMAuthenticator(apikey=txt_speech_settings.ibm_api_key)
 
 
@@ -214,7 +301,7 @@ def check_user_prompt(text: str, valid_documents: List[Document]):
     """
 
     model = ChatDeepInfra(
-        deepinfra_api_token=DEEPINFRA_API_KEY,
+        deepinfra_api_token=llm_settings.deepinfra_api_key,
         model="google/gemma-1.1-7b-it",
         max_tokens=5,
         temperature=0.2,
@@ -246,7 +333,7 @@ def generate_story(user_prompt: str, context_documents: List[Document]):
     frequency_penalty = AI21PenaltyData(scale=4)
     llm = AI21(
         model="j2-mid",
-        ai21_api_key=AI21_API_KEY,
+        ai21_api_key=llm_settings.ai21_api_key,
         maxTokens=2000,
         presencePenalty=presence_penalty,
         minTokens=100,
@@ -358,6 +445,7 @@ def chunk_and_save(pages: List[WikiPage]):
         )
         for page in page_splits
     ]
+    return len(result)
 
 
 def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Document]:
@@ -394,15 +482,18 @@ prompt = "Write on how JFK's father actuallly wanted his brother to become presi
 # # print([i for i in content])
 # chunk_and_save(contents)
 
-#
-documents = return_documents(
-    prompt,
-    index_names=["john_f._kennedy", "assassination_of_john_f._kennedy", "jfk_(film)"],
-)
+# #
+# documents = return_documents(
+#     prompt,
+#     index_names=["john_f._kennedy", "assassination_of_john_f._kennedy", "jfk_(film)"],
+# )
 
-# print(documents)
+# # print(documents)
 
-print(check_user_prompt(text=prompt, valid_documents=documents))
+# print(check_user_prompt(text=prompt, valid_documents=documents))
 # # print(documents)
 
 # print(get_story(user_prompt=prompt, context_documents=documentsa))
+
+
+print(generate_presigned_url("hello.txt"))

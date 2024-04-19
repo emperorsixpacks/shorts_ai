@@ -1,2 +1,6 @@
 .env
 poetry.lock
+speaker_16.wav
+ibm-credentials.env
+
+__pycache__/

@@ -93,3 +93,17 @@ class TxtSpeechsettings(BaseConfig):
     ibm_api_key: str = None
     ibm_url: str = None
     ibm_service_name: str = None
+
+
+class AWSSettings(BaseConfig):
+    """
+    Settings for AWS credentials.
+
+    Attributes:
+        aws_secret_key (str): AWS secret key.
+        aws_access_key (str): AWS access key.
+    """
+
+    aws_secret_key: str = None
+    aws_access_key: str = None
+    s3_bucket: str = None
