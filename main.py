@@ -7,7 +7,12 @@ import wikipediaapi
 import praw
 from dotenv import load_dotenv
 from ffmpeg import FFmpeg
-import wave
+
+from huggingface_hub import InferenceClient
+
+from langchain_community.llms.ai21 import AI21, AI21PenaltyData
+from langchain_community.chat_models.deepinfra import ChatDeepInfra
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
@@ -15,15 +20,15 @@ from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings.huggingface import HuggingFaceBgeEmbeddings
 from langchain.vectorstores.redis import RedisVectorStoreRetriever, Redis
-from langchain_core.messages import HumanMessage, SystemMessage
-from ibm_watson import TextToSpeechV1, DiscoveryV2
+
+from ibm_watson import TextToSpeechV1
 from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
 
 from settings import (
     RedditSettings,
     RedisSettings,
     EmbeddingSettings,
-    TexttoSpeechsettings,
+    TxtSpeechsettings,
     LLMsettings,
     HuggingFaceHubSettings,
 )
@@ -31,7 +36,7 @@ from settings import (
 reddit_settings = RedditSettings()
 redis_settings = RedisSettings()
 embeddings_settings = EmbeddingSettings()
-txt_speech_settings = TexttoSpeechsettings()
+txt_speech_settings = TxtSpeechsettings()
 llm_settings = LLMsettings()
 hf_hub_settings = HuggingFaceHubSettings()
 
@@ -50,16 +55,6 @@ redis_url = f"redis://{REDIS_HOST}:{REDIS_PORT}"
 wiki_wiki = wikipediaapi.Wikipedia("MyProjectName (merlin@example.com)", "en")
 ner_model = InferenceClient(token=hf_hub_settings.HuggingFacehub_api_token)
 embeddings = HuggingFaceBgeEmbeddings(model_name=embeddings_settings.embedding_model)
-
-authenticator = IAMAuthenticator(apikey=txt_speech_settings.iam_apikey)
-with wave.open("speaker_16.wav", "rb") as wav_file:
-    # Read binary data from the WAV file
-    speaker_audio = wav_file.readframes(wav_file.getnframes())
-
-discovery = DiscoveryV2(version="2019-04-30")
-# speaker_adam= TextToSpeechV1(service_name="text_to_speach").list_speaker_models()
-
-# print(speaker_adam)
 
 
 @dataclass
@@ -107,7 +102,9 @@ def get_videos_from_subreddit():
     list: A list of dictionaries containing video information like title, URL, and author.
     """
     reddit = praw.Reddit(
-        client_id=reddit_settings.reddit_client_id, client_secret=reddit_settings.reddit_client_secret, user_agent="vidoe_bot"
+        client_id=reddit_settings.reddit_client_id,
+        client_secret=reddit_settings.reddit_client_secret,
+        user_agent="vidoe_bot",
     )
 
     # Get the subreddit instance
@@ -276,7 +273,9 @@ def return_ner_tokens(text: str):
     Returns:
     - list: A list of NER tokens extracted from the input text.
     """
-    result = ner_model.token_classification(text=text, model=hf_hub_settings.ner_repo_id)
+    result = ner_model.token_classification(
+        text=text, model=hf_hub_settings.ner_repo_id
+    )
     return [i["word"].strip() for i in result]
 
 
