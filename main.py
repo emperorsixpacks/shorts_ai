@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 import requests
 import wikipediaapi
 import praw
+from dotenv import load_dotenv
 from ffmpeg import FFmpeg
-import wave
 
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
@@ -15,45 +15,36 @@ from langchain.schema import Document
 from huggingface_hub import InferenceClient
 from langchain_community.llms.ai21 import AI21, AI21PenaltyData
 from langchain_community.chat_models.deepinfra import ChatDeepInfra
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings.huggingface import HuggingFaceBgeEmbeddings
 from langchain.vectorstores.redis import RedisVectorStoreRetriever, Redis
-from langchain_core.messages import HumanMessage, SystemMessage
-from ibm_watson import TextToSpeechV1, DiscoveryV2
-from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
-
-from settings import (
-    RedditSettings,
-    RedisSettings,
-    EmbeddingSettings,
-    TexttoSpeechsettings,
-    LLMsettings,
-    HuggingFaceHubSettings,
-)
-
-reddit_settings = RedditSettings()
-redis_settings = RedisSettings()
-embeddings_settings = EmbeddingSettings()
-txt_speech_settings = TexttoSpeechsettings()
-llm_settings = LLMsettings()
-hf_hub_settings = HuggingFaceHubSettings()
 
 
+load_dotenv("./.env")
+
+CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
+CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+HUGGINGFACEHUB_API_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+GOOGLE_AI_API_TOKEN = os.getenv("GOOGLE_AI_API_TOKEN")
+REDPO_ID = "mistralai/Mistral-7B-Instruct-v0.2"
+ENDPOINT_URL = f"https://api-inference.huggingface.co/models/{REDPO_ID}"
+NER_REPO_ID = "jean-baptiste/roberta-large-ner-english"
 WIKI_API_SEARCH_URL = "https://en.wikipedia.org/w/rest.php/v1/search/page?q={}&limit=4"
-redis_url = f"redis://{redis_settings.redis_host}:{redis_settings.redis_port}"
+REDIS_PORT = os.getenv("REDIS_PORT")
+REDIS_HOST = os.getenv("REDIS_HOST")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+TEXT_TO_QUESTION_MODEL = os.getenv("TEXT_TO_QUESTION_MODEL")
+AI21_API_KEY = os.getenv("AI21_API_KEY")
+DEEPINFRA_API_KEY = os.getenv("DEEPINFRA_API_KEY")
+
+redis_url = f"redis://{REDIS_HOST}:{REDIS_PORT}"
+
+
 wiki_wiki = wikipediaapi.Wikipedia("MyProjectName (merlin@example.com)", "en")
-ner_model = InferenceClient(token=hf_hub_settings.HuggingFacehub_api_token)
-embeddings = HuggingFaceBgeEmbeddings(model_name=embeddings_settings.embedding_model)
-
-authenticator = IAMAuthenticator(apikey=txt_speech_settings.iam_apikey)
-with wave.open("speaker_16.wav", "rb") as wav_file:
-    # Read binary data from the WAV file
-    speaker_audio = wav_file.readframes(wav_file.getnframes())
-
-discovery = DiscoveryV2(version="2019-04-30")
-# speaker_adam= TextToSpeechV1(service_name="text_to_speach").list_speaker_models()
-
-# print(speaker_adam)
+ner_model = InferenceClient(token=HUGGINGFACEHUB_API_TOKEN)
+embeddings = HuggingFaceBgeEmbeddings(model_name=EMBEDDING_MODEL)
 
 
 @dataclass
@@ -101,7 +92,7 @@ def get_videos_from_subreddit():
     list: A list of dictionaries containing video information like title, URL, and author.
     """
     reddit = praw.Reddit(
-        client_id=reddit_settings.reddit_client_id, client_secret=reddit_settings.reddit_client_secret, user_agent="vidoe_bot"
+        client_id=CLIENT_ID, client_secret=CLIENT_SECRET, user_agent="vidoe_bot"
     )
 
     # Get the subreddit instance
@@ -168,6 +159,7 @@ def open_prompt_txt(file: str) -> str:
         return f.read()
 
 
+
 def extract_answer(llm_output):
     """
     A function that extracts an answer from the given LLM output. It searches for a pattern that matches '**True**\n\nThe'
@@ -194,7 +186,7 @@ def check_user_prompt(text: str, valid_documents: List[Document]):
     """
 
     model = ChatDeepInfra(
-        deepinfra_api_token=llm_settings.deepinfra_api_key,
+        deepinfra_api_token=DEEPINFRA_API_KEY,
         model="google/gemma-1.1-7b-it",
         max_tokens=5,
         temperature=0.2,
@@ -226,7 +218,7 @@ def generate_story(user_prompt: str, context_documents: List[Document]):
     frequency_penalty = AI21PenaltyData(scale=4)
     llm = AI21(
         model="j2-mid",
-        ai21_api_key=llm_settings.ai21_api_key,
+        ai21_api_key=AI21_API_KEY,
         maxTokens=2000,
         presencePenalty=presence_penalty,
         minTokens=100,
@@ -253,7 +245,7 @@ def return_ner_tokens(text: str):
     Returns:
     - list: A list of NER tokens extracted from the input text.
     """
-    result = ner_model.token_classification(text=text, model=hf_hub_settings.ner_repo_id)
+    result = ner_model.token_classification(text=text, model=NER_REPO_ID)
     return [i["word"].strip() for i in result]
 
 
@@ -336,7 +328,6 @@ def chunk_and_save(pages: List[WikiPage]):
         )
         for page in page_splits
     ]
-    return len(result)
 
 
 def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Document]:
@@ -373,15 +364,15 @@ prompt = "Write on how JFK's father actuallly wanted his brother to become presi
 # # print([i for i in content])
 # chunk_and_save(contents)
 
-# #
-# documents = return_documents(
-#     prompt,
-#     index_names=["john_f._kennedy", "assassination_of_john_f._kennedy", "jfk_(film)"],
-# )
+#
+documents = return_documents(
+    prompt,
+    index_names=["john_f._kennedy", "assassination_of_john_f._kennedy", "jfk_(film)"],
+)
 
-# # print(documents)
+# print(documents)
 
-# print(check_user_prompt(text=prompt, valid_documents=documents))
+print(check_user_prompt(text=prompt, valid_documents=documents))
 # # print(documents)
 
 # print(get_story(user_prompt=prompt, context_documents=documentsa))
