@@ -68,7 +68,7 @@ class EmbeddingSettings(BaseConfig):
     embedding_model: str = None
 
 
-class LLMsettings(BaseConfig):
+class LLMSettings(BaseConfig):
     """
     Settings for the ASSISTANT Language Model (LLM) API credentials.
 
@@ -81,7 +81,7 @@ class LLMsettings(BaseConfig):
     deepinfra_api_key: str = None
 
 
-class TxtSpeechsettings(BaseConfig):
+class TxtSpeechSettings(BaseConfig):
     """
     Settings for IBM Watson Text to Speech API credentials.
 
@@ -103,7 +103,7 @@ class AWSSettings(BaseConfig):
         aws_secret_key (str): AWS secret key.
         aws_access_key (str): AWS access key.
     """
-
+    fastly_url: str = None
     aws_secret_key: str = None
     aws_access_key: str = None
     s3_bucket: str = None

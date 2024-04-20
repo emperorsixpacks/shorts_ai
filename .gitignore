@@ -2,5 +2,6 @@
 poetry.lock
 speaker_16.wav
 ibm-credentials.env
-
+*.log
+*.pyc
 __pycache__/

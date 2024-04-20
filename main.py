@@ -1,9 +1,11 @@
 import re
 import random
+import logging
 from typing import List
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from enum import StrEnum
+from datetime import datetime
 
 import requests
 import wikipediaapi
@@ -32,17 +34,30 @@ from settings import (
     RedditSettings,
     RedisSettings,
     EmbeddingSettings,
-    TxtSpeechsettings,
-    LLMsettings,
+    TxtSpeechSettings,
+    LLMSettings,
     HuggingFaceHubSettings,
     AWSSettings,
 )
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+file_handler = logging.FileHandler("logs/app.log")
+file_handler.setLevel(logging.DEBUG)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+file_handler.setFormatter(formatter)
+console_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
+
+
 reddit_settings = RedditSettings()
 redis_settings = RedisSettings()
 embeddings_settings = EmbeddingSettings()
-txt_speech_settings = TxtSpeechsettings()
-llm_settings = LLMsettings()
+txt_speech_settings = TxtSpeechSettings()
+llm_settings = LLMSettings()
 hf_hub_settings = HuggingFaceHubSettings()
 aws_settings = AWSSettings()
 
@@ -50,6 +65,12 @@ WIKI_API_SEARCH_URL = "https://en.wikipedia.org/w/rest.php/v1/search/page?q={}&l
 redis_url = f"redis://{redis_settings.redis_host}:{redis_settings.redis_port}"
 wiki_wiki = wikipediaapi.Wikipedia("MyProjectName (merlin@example.com)", "en")
 ner_model = InferenceClient(token=hf_hub_settings.HuggingFacehub_api_token)
+
+aws_client = boto3.client(
+    "s3",
+    aws_access_key_id=aws_settings.aws_access_key,
+    aws_secret_access_key=aws_settings.aws_secret_key,
+)
 
 
 @lru_cache
@@ -68,27 +89,67 @@ class SupportedMediaFileType(StrEnum):
     Supported media file types for downloading and converting
     """
 
-    MP4 = ".mp4"
-    WAV = ".wav"
+    VIDEO = "mp4"
+    AUDIO = "wav"
+
+
+class AWSS3Method(StrEnum):
+    """
+    Supported AWS S3 methods
+    """
+
+    PUT = "put_object"
+    GET = "get_object"
 
 
 @dataclass
-class BaseMedia:
+class MediaFile:
     """
     Dataclass for storing metadata about a media file
 
-    location: file location on disk
     name: name of the file
     size: size of the file in bytes
     duration: duration of the media file in seconds
     file_type: file type of the media file (e.g. "mp4", "wav")
     """
 
-    location: str
     name: str
-    size: int
-    duration: int
     file_type: SupportedMediaFileType
+    size: int = None
+    duration: int = None
+    url: str = None
+    timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()))
+
+    def __post_init__(self):
+        self.name = self.name.replace(" ", "_")
+
+    def return_formated_name(self):
+        """
+        Returns a formatted name for the media file based on the file type.
+
+        Returns:
+            str: The formatted name of the media file.
+        """
+        match self.file_type:
+            case SupportedMediaFileType.VIDEO:
+                return f"video_{self.name}-{self.timestamp}.{self.file_type}"
+
+            case SupportedMediaFileType.AUDIO:
+                return f"audio_{self.name}-{self.timestamp}.{self.file_type}"
+
+
+    @property
+    def location(self):
+        """
+        Returns the location of the media file.
+
+        Returns:
+            str: The location of the media file.
+            None: If the name of the media file is None.
+        """
+        if self.name is None:
+            return None
+        return aws_settings.fastly_url + self.return_formated_name()
 
 
 @dataclass
@@ -110,48 +171,52 @@ class WikiPage:
         return self.page_title
 
 
-@dataclass
-class Audio(BaseMedia):
-    def __str__(self) -> str:
-        return f"audio_{self.name}.{self.file_type}"
-
-
-@dataclass
-class Video(BaseMedia):
-    def __str__(self) -> str:
-        return f"video_{self.name}.{self.file_type}"
-
-
-def generate_presigned_url(object_key: str, expiration: int = 3600):
+def generate_presigned_url(
+    client,
+    method: AWSS3Method,
+    *,
+    object_key: str,
+    file_type: SupportedMediaFileType,
+    expiration: int = 120,
+) -> MediaFile:
     """
-    Generates a presigned URL for uploading an object to an S3 bucket.
+    Generates a presigned URL for an S3 object.
 
-    Parameters:
-        object_key (str): The key of the object to be uploaded.
-        expiration (int, optional): The expiration time of the presigned URL in seconds. Defaults to 3600.
+    Args:
+        client (boto3.client): The S3 client.
+        method (AWSS3Method): The HTTP method to use for the presigned URL.
+        object_key (str): The key of the S3 object.
+        file_type (SupportedMediaFileType): The file type of the S3 object.
+        expiration (int, optional): The expiration time of the presigned URL in seconds. Defaults to 36.
 
     Returns:
-        str: The generated presigned URL for uploading the object.
-        None: If the AWS credentials are not available.
+        MediaFile: The media file with the generated presigned URL.
+
+    Raises:
+        NoCredentialsError: If AWS credentials are not available.
     """
-    aws_client = boto3.client(
-        "s3",
-        aws_access_key_id=aws_settings.aws_access_key,
-        aws_secret_access_key=aws_settings.aws_secret_key,
-    )
+
+    logger.info("Generating presigned URL")
+
+    media_file = MediaFile(name=object_key, file_type=file_type)
     try:
-        url = aws_client.generate_presigned_url(
-            "put_object",
-            Params={"Bucket": aws_settings.s3_bucket, "Key": object_key},
+        url = client.generate_presigned_url(
+            method,
+            Params={
+                "Bucket": aws_settings.s3_bucket,
+                "Key": media_file.return_formated_name(),
+            },
             ExpiresIn=expiration,
         )
-        return url
+        media_file.url = url
+        logger.info("Presigned URL generated successfully")
+        return media_file
     except NoCredentialsError:
-        print("Credentials not available")
+        logger.error("No AWS credentials available")
         return None
 
 
-def upload_file_to_s3(url, file_content):
+def upload_file_to_s3(media_file: MediaFile, file_content):
     """
     Uploads file content to a specified S3 URL using PUT request.
 
@@ -162,13 +227,15 @@ def upload_file_to_s3(url, file_content):
     Returns:
     None
     """
-    response = requests.put(url, data=file_content, timeout=60)
-
-    # Check if the upload was successful
+    logger.info("Uploading file to S3")
+    response = requests.put(media_file.url, data=file_content, timeout=60)
     if response.status_code == 200:
-        print("File uploaded successfully.")
+        logger.info("File uploaded successfully")
+        return True
     else:
-        print(f"Failed to upload file. Status code: {response.status_code}")
+        logger.warning(
+            "Failed to upload file. Status code: {}".format(response.status_code)
+        )
         print(response.content)
 
 
@@ -179,6 +246,8 @@ def get_videos_from_subreddit():
     Returns:
     list: A list of dictionaries containing video information like title, URL, and author.
     """
+
+    logger.info("Getting videos from subreddit")
     reddit = praw.Reddit(
         client_id=reddit_settings.reddit_client_id,
         client_secret=reddit_settings.reddit_client_secret,
@@ -214,33 +283,17 @@ def get_videos_from_subreddit():
                         "author": submission.author.name,
                     }
                 )
+    logger.info("Videos retrieved successfully")
     return random.choice(videos)
 
 
-def convert_video(video_file: str, audio_file: str):
-
-    ffmpeg = (
-        FFmpeg()
-        .option("y")
-        .input(video_file, stream_loop=-1)
-        .input(audio_file)
-        .output(
-            "output.mp4",
-            options={"codec:a": "libmp3lame", "filter:v": "scale=-1:1080"},
-            map=["0:v:0", "1:a:0"],
-            shortest=None,
-        )
-    )
-
-    ffmpeg.execute()
-
-
-def convert_text_to_audio(text: str):
+def combine_video_and_audio(input_video_file: str, input_audio_file: MediaFile):
     """
-    Converts the given text to audio using the IBM Watson Text to Speech service.
+    Combines a video file and an audio file into a single MP4 file using FFmpeg.
 
     Args:
-        text (str): The text to be converted to audio.
+        video_file (str): The path to the video file.
+        audio_file (MediaFile): The audio file to be combined with the video.
 
     Returns:
         None
@@ -248,16 +301,53 @@ def convert_text_to_audio(text: str):
     Raises:
         None
     """
-    authenticator = IAMAuthenticator(apikey=txt_speech_settings.ibm_api_key)
+    logger.info("Combining video and audio")
+    print(input_audio_file.location)
+    ffmpeg = (
+        FFmpeg()
+        .option("y")
+        .input(input_video_file, stream_loop=-1)
+        .input(input_audio_file.location)
+        .output(
+            "output.mp4",
+            options={"codec:a": "libmp3lame", "filter:v": "scale=-1:1080"},
+            map=["0:v:0", "1:a:0"],
+            shortest=None,
+        )
+    )
+    logger.info("Video and audio combined successfully")
+    ffmpeg.execute()
 
+
+def convert_text_to_audio(client, name: str, text: str) -> MediaFile | None:
+    """
+    Converts the given text to audio using the IBM Watson Text to Speech service.
+
+    Args:
+        client (boto3.client): The S3 client.
+        name (str): The name of the audio file.
+        text (str): The text to be converted to audio.
+
+    Returns:
+        MediaFile | None: The media file with the generated audio content, or None if the upload fails.
+
+    Raises:
+        None
+    """
+    logger.info("Converting text to audio")
+    media_file =  MediaFile(name=name, file_type=SupportedMediaFileType.AUDIO)
+    authenticator = IAMAuthenticator(apikey=txt_speech_settings.ibm_api_key)
     txt_speech = TextToSpeechV1(authenticator=authenticator)
     txt_speech.set_service_url(service_url=txt_speech_settings.ibm_url)
-    url = generate_presigned_url(object_key="hello_world.wav")
-    print(url)
-    # with open("hello.wav", "wb") as wav_file:
-    # Read binary data from the WAV file
-    upload_file_to_s3(
-        url=url,
+    media_file = generate_presigned_url(
+        client,
+        AWSS3Method.PUT,
+        object_key=media_file.return_formated_name(),
+        file_type=SupportedMediaFileType.AUDIO,
+    )
+    logger.info("Generating audio")
+    result = upload_file_to_s3(
+        media_file=media_file,
         file_content=txt_speech.synthesize(
             text,
             accept="audio/wav",
@@ -267,6 +357,11 @@ def convert_text_to_audio(text: str):
         .get_result()
         .content,
     )
+    if not result:
+        logger.warning("Failed to upload audio to S3")
+        return None
+    logger.info("Audio converted successfully")
+    
 
 
 def open_prompt_txt(file: str) -> str:
@@ -301,7 +396,7 @@ def check_user_prompt(text: str, valid_documents: List[Document]):
     Returns:
     - str: The question generated based on the user prompt and documents.
     """
-
+    logger.info("Checking user prompt against documents")
     model = ChatDeepInfra(
         deepinfra_api_token=llm_settings.deepinfra_api_key,
         model="google/gemma-1.1-7b-it",
@@ -330,7 +425,7 @@ def generate_story(user_prompt: str, context_documents: List[Document]):
     Returns:
         str: The generated story question.
     """
-
+    logger.info("Generating story question")
     presence_penalty = AI21PenaltyData(scale=4.9)
     frequency_penalty = AI21PenaltyData(scale=4)
     llm = AI21(
@@ -349,6 +444,7 @@ def generate_story(user_prompt: str, context_documents: List[Document]):
     )
     chain = LLMChain(llm=llm, prompt=final_prompt)
     question = chain.invoke({"user": user_prompt, "documents": context_documents})
+    logger.info("Story question generated successfully")
     return question["text"]
 
 
@@ -472,18 +568,24 @@ def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Docume
     ]
 
 
-# def main():
-#     prompt = "Write on how JFK's father actuallly wanted his brother to become president and not him"
-#     documents = return_documents(
-#         prompt,
-#         index_names=[
-#             "john_f._kennedy",
-#             "assassination_of_john_f._kennedy",
-#             "jfk_(film)",
-#         ],
-#     )
-#     story = get_story(user_prompt=prompt, context_documents=documents)
-#     audio = convert_text_to_audio(text=story)
+def main():
+    prompt = "Write on how JFK's father actuallly wanted his brother to become president and not him"
+    documents = return_documents(
+        prompt,
+        index_names=[
+            "john_f._kennedy",
+            "assassination_of_john_f._kennedy",
+            "jfk_(film)",
+        ],
+    )
+    story = generate_story(user_prompt=prompt, context_documents=documents)
+    audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    video = get_videos_from_subreddit()
+    combine_video_and_audio(input_video_file=video, input_audio_file=audio)
+
+
+if __name__ == "__main__":
+    main()
 
 
 # tokens = return_ner_tokens(prompt)
@@ -503,4 +605,14 @@ def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Docume
 # # print(documents)
 
 # print(convert_text_to_audio("he"))
-print(convert_text_to_audio(text="hello"))
+# story =
+# print(convert_text_to_audio(text="hello"))
+# print(generate_presigned_url("hello_world.wav"))
+
+
+# mefia_file =
+# (name="hello", file_type=SupportedMediaFileType.VIDEO)
+# print(mefia_file.return_formated_name())
+
+
+# # TODO get media information
