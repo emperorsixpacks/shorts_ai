@@ -121,7 +121,8 @@ class MediaFile:
     timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()))
 
     def __post_init__(self):
-        self.name = self.name.replace(" ", "_")
+        self.name = self.name.replace(" ", "_").lower()
+        
 
     def return_formated_name(self):
         """
@@ -149,7 +150,7 @@ class MediaFile:
         """
         if self.name is None:
             return None
-        return aws_settings.fastly_url + self.return_formated_name()
+        return f"{aws_settings.fastly_url}{self.return_formated_name()}"
 
 
 @dataclass
@@ -175,8 +176,7 @@ def generate_presigned_url(
     client,
     method: AWSS3Method,
     *,
-    object_key: str,
-    file_type: SupportedMediaFileType,
+    media_file: MediaFile,
     expiration: int = 120,
 ) -> MediaFile:
     """
@@ -198,7 +198,6 @@ def generate_presigned_url(
 
     logger.info("Generating presigned URL")
 
-    media_file = MediaFile(name=object_key, file_type=file_type)
     try:
         url = client.generate_presigned_url(
             method,
@@ -208,9 +207,9 @@ def generate_presigned_url(
             },
             ExpiresIn=expiration,
         )
-        media_file.url = url
+        
         logger.info("Presigned URL generated successfully")
-        return media_file
+        return url
     except NoCredentialsError:
         logger.error("No AWS credentials available")
         return None
@@ -306,7 +305,7 @@ def combine_video_and_audio(input_video_file: str, input_audio_file: MediaFile):
     ffmpeg = (
         FFmpeg()
         .option("y")
-        .input(input_video_file, stream_loop=-1)
+        .input(input_video_file["url"], stream_loop=-1)
         .input(input_audio_file.location)
         .output(
             "output.mp4",
@@ -315,8 +314,8 @@ def combine_video_and_audio(input_video_file: str, input_audio_file: MediaFile):
             shortest=None,
         )
     )
-    logger.info("Video and audio combined successfully")
     ffmpeg.execute()
+    logger.info("Video and audio combined successfully")
 
 
 def convert_text_to_audio(client, name: str, text: str) -> MediaFile | None:
@@ -339,12 +338,12 @@ def convert_text_to_audio(client, name: str, text: str) -> MediaFile | None:
     authenticator = IAMAuthenticator(apikey=txt_speech_settings.ibm_api_key)
     txt_speech = TextToSpeechV1(authenticator=authenticator)
     txt_speech.set_service_url(service_url=txt_speech_settings.ibm_url)
-    media_file = generate_presigned_url(
+    media_file_url = generate_presigned_url(
         client,
         AWSS3Method.PUT,
-        object_key=media_file.return_formated_name(),
-        file_type=SupportedMediaFileType.AUDIO,
+        media_file=media_file,
     )
+    media_file.url = media_file_url
     logger.info("Generating audio")
     result = upload_file_to_s3(
         media_file=media_file,
@@ -361,7 +360,7 @@ def convert_text_to_audio(client, name: str, text: str) -> MediaFile | None:
         logger.warning("Failed to upload audio to S3")
         return None
     logger.info("Audio converted successfully")
-    
+    return media_file
 
 
 def open_prompt_txt(file: str) -> str:
@@ -569,7 +568,7 @@ def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Docume
 
 
 def main():
-    prompt = "Write on how JFK's father actuallly wanted his brother to become president and not him"
+    prompt = "Write on what happened to John F. Kennedy's brain after he was killed"
     documents = return_documents(
         prompt,
         index_names=[
