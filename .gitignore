@@ -6,3 +6,5 @@ ibm-credentials.env
 *.log
 *.pyc
 __pycache__/
+export_env
+

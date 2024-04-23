@@ -11,8 +11,10 @@ import requests
 import wikipediaapi
 import praw
 from ffmpeg import FFmpeg
+
 import boto3
 from botocore.exceptions import NoCredentialsError
+
 
 from huggingface_hub import InferenceClient
 
@@ -27,8 +29,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings.huggingface import HuggingFaceBgeEmbeddings
 from langchain.vectorstores.redis import RedisVectorStoreRetriever, Redis
 
-from ibm_watson import TextToSpeechV1
-from ibm_cloud_sdk_core.authenticators import IAMAuthenticator
+from google.cloud import texttospeech
 
 from settings import (
     RedditSettings,
@@ -122,7 +123,6 @@ class MediaFile:
 
     def __post_init__(self):
         self.name = self.name.replace(" ", "_").lower()
-        
 
     def return_formated_name(self):
         """
@@ -138,7 +138,6 @@ class MediaFile:
             case SupportedMediaFileType.AUDIO:
                 return f"audio_{self.name}-{self.timestamp}.{self.file_type}"
 
-
     @property
     def location(self):
         """
@@ -151,6 +150,29 @@ class MediaFile:
         if self.name is None:
             return None
         return f"{aws_settings.fastly_url}{self.return_formated_name()}"
+    
+    
+@dataclass
+class Story:
+    """
+    Dataclass for storing metadata about a story.
+
+    Attributes:
+        prompt (str): The prompt for the story.
+        text (str): The story text.
+    """
+    prompt: str
+    text: str
+    
+    @property
+    def length(self) -> int:
+        """
+        Returns the length of the story in words.
+
+        Returns:
+            int: The length of the story in words.
+        """
+        return len(self.text.split())
 
 
 @dataclass
@@ -207,7 +229,7 @@ def generate_presigned_url(
             },
             ExpiresIn=expiration,
         )
-        
+
         logger.info("Presigned URL generated successfully")
         return url
     except NoCredentialsError:
@@ -301,7 +323,7 @@ def combine_video_and_audio(input_video_file: str, input_audio_file: MediaFile):
         None
     """
     logger.info("Combining video and audio")
-    print(input_audio_file.location)
+    # print(input_audio_file.location)
     ffmpeg = (
         FFmpeg()
         .option("y")
@@ -334,7 +356,7 @@ def convert_text_to_audio(client, name: str, text: str) -> MediaFile | None:
         None
     """
     logger.info("Converting text to audio")
-    media_file =  MediaFile(name=name, file_type=SupportedMediaFileType.AUDIO)
+    media_file = MediaFile(name=name, file_type=SupportedMediaFileType.AUDIO)
     authenticator = IAMAuthenticator(apikey=txt_speech_settings.ibm_api_key)
     txt_speech = TextToSpeechV1(authenticator=authenticator)
     txt_speech.set_service_url(service_url=txt_speech_settings.ibm_url)
@@ -413,7 +435,7 @@ def check_user_prompt(text: str, valid_documents: List[Document]):
     return extract_answer(llm_output=llm_output)
 
 
-def generate_story(user_prompt: str, context_documents: List[Document]):
+def generate_story(user_prompt: str, context_documents: List[Document]) -> Story:
     """
     Generates a story question based on the user prompt and context documents.
 
@@ -424,16 +446,18 @@ def generate_story(user_prompt: str, context_documents: List[Document]):
     Returns:
         str: The generated story question.
     """
-    logger.info("Generating story question")
+    logger.info("Generating story")
     presence_penalty = AI21PenaltyData(scale=4.9)
     frequency_penalty = AI21PenaltyData(scale=4)
     llm = AI21(
         model="j2-mid",
         ai21_api_key=llm_settings.ai21_api_key,
-        maxTokens=2000,
+        maxTokens=100,
         presencePenalty=presence_penalty,
-        minTokens=100,
+        minTokens=80,
         frequencyPenalty=frequency_penalty,
+        temperature=0.5,
+        topP = 0.2
     )
 
     prompt_template = open_prompt_txt("prompt.txt")
@@ -444,7 +468,7 @@ def generate_story(user_prompt: str, context_documents: List[Document]):
     chain = LLMChain(llm=llm, prompt=final_prompt)
     question = chain.invoke({"user": user_prompt, "documents": context_documents})
     logger.info("Story question generated successfully")
-    return question["text"]
+    return Story(prompt=user_prompt, text=question["text"])
 
 
 def return_ner_tokens(text: str):
@@ -578,9 +602,11 @@ def main():
         ],
     )
     story = generate_story(user_prompt=prompt, context_documents=documents)
-    audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
-    video = get_videos_from_subreddit()
-    combine_video_and_audio(input_video_file=video, input_audio_file=audio)
+    print(story.length)
+    print(story.text)
+    # audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    # video = get_videos_from_subreddit()
+    # combine_video_and_audio(input_video_file=video, input_audio_file=audio)
 
 
 if __name__ == "__main__":
