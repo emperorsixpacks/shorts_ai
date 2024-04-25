@@ -29,8 +29,6 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings.huggingface import HuggingFaceBgeEmbeddings
 from langchain.vectorstores.redis import RedisVectorStoreRetriever, Redis
 
-from google.cloud import texttospeech
-
 from settings import (
     RedditSettings,
     RedisSettings,
@@ -52,6 +50,7 @@ file_handler.setFormatter(formatter)
 console_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
+
 
 
 reddit_settings = RedditSettings()
@@ -150,8 +149,8 @@ class MediaFile:
         if self.name is None:
             return None
         return f"{aws_settings.fastly_url}{self.return_formated_name()}"
-    
-    
+
+
 @dataclass
 class Story:
     """
@@ -161,9 +160,10 @@ class Story:
         prompt (str): The prompt for the story.
         text (str): The story text.
     """
+
     prompt: str
     text: str
-    
+
     @property
     def length(self) -> int:
         """
@@ -257,7 +257,7 @@ def upload_file_to_s3(media_file: MediaFile, file_content):
         logger.warning(
             "Failed to upload file. Status code: {}".format(response.status_code)
         )
-        print(response.content)
+        return False
 
 
 def get_videos_from_subreddit():
@@ -339,44 +339,40 @@ def combine_video_and_audio(input_video_file: str, input_audio_file: MediaFile):
     ffmpeg.execute()
     logger.info("Video and audio combined successfully")
 
+ 
 
-def convert_text_to_audio(client, name: str, text: str) -> MediaFile | None:
+def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
     """
-    Converts the given text to audio using the IBM Watson Text to Speech service.
+    Converts text to audio using the TTSMP3 API.
 
-    Args:
-        client (boto3.client): The S3 client.
+    Parameters:
+        client (Client): The AWS client.
         name (str): The name of the audio file.
-        text (str): The text to be converted to audio.
+        text (Story): The text to be converted to audio.
 
     Returns:
-        MediaFile | None: The media file with the generated audio content, or None if the upload fails.
-
-    Raises:
-        None
+        MediaFile | None: The converted audio file if successful, None otherwise.
     """
+  
     logger.info("Converting text to audio")
     media_file = MediaFile(name=name, file_type=SupportedMediaFileType.AUDIO)
-    authenticator = IAMAuthenticator(apikey=txt_speech_settings.ibm_api_key)
-    txt_speech = TextToSpeechV1(authenticator=authenticator)
-    txt_speech.set_service_url(service_url=txt_speech_settings.ibm_url)
+    data = {
+        "msg": text.text,
+        "lang":"Matthew",
+        "source":"ttsmp3"
+    }
+    generated_audio = requests.post("https://ttsmp3.com/makemp3_new.php", data=data, timeout=60).json()
     media_file_url = generate_presigned_url(
         client,
         AWSS3Method.PUT,
         media_file=media_file,
     )
     media_file.url = media_file_url
+    audio_content = lambda url : requests.get(url, timeout=60).content
     logger.info("Generating audio")
     result = upload_file_to_s3(
         media_file=media_file,
-        file_content=txt_speech.synthesize(
-            text,
-            accept="audio/wav",
-            voice="en-US_HenryV3Voice",
-            pitch_percentage=25,
-        )
-        .get_result()
-        .content,
+        file_content= audio_content(generated_audio["URL"]),
     )
     if not result:
         logger.warning("Failed to upload audio to S3")
@@ -401,12 +397,11 @@ def extract_answer(llm_output):
     The function returns the first match found.
     """
     llm_output_list = llm_output.split("\n")
-    print(llm_output_list)
     result_match = re.findall(r"(True|False)", llm_output_list[0])
     return result_match[0]
 
 
-def check_user_prompt(text: str, valid_documents: List[Document]):
+def check_user_prompt(text: str, valid_documents: List[Document]) -> bool:
     """
     A function that checks a user prompt against a list of documents and returns a question generated based on the prompt and documents.
 
@@ -432,7 +427,7 @@ def check_user_prompt(text: str, valid_documents: List[Document]):
         HumanMessage(content=f"user text: {text} \n docuemnts: {valid_documents}"),
     ]
     llm_output = model.invoke(messages).content
-    return extract_answer(llm_output=llm_output)
+    return bool(extract_answer(llm_output=llm_output))
 
 
 def generate_story(user_prompt: str, context_documents: List[Document]) -> Story:
@@ -457,7 +452,7 @@ def generate_story(user_prompt: str, context_documents: List[Document]) -> Story
         minTokens=80,
         frequencyPenalty=frequency_penalty,
         temperature=0.5,
-        topP = 0.2
+        topP=0.2,
     )
 
     prompt_template = open_prompt_txt("prompt.txt")
@@ -560,13 +555,11 @@ def chunk_and_save(pages: List[WikiPage]):
         for page in pages
         if page.text != ""
     ]
-    result = [
+    for page in page_splits:
         Redis.from_texts(
             page.text, embeddings, redis_url=redis_url, index_name=page.page_title
         )
-        for page in page_splits
-    ]
-    return len(result)
+    return
 
 
 def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Document]:
@@ -601,12 +594,15 @@ def main():
             "jfk_(film)",
         ],
     )
+    checked_prompt = check_user_prompt(text=prompt, valid_documents=documents)
+    if not checked_prompt:
+        print("mate, this never happened or I am to old to remember 🥲")
+        return
     story = generate_story(user_prompt=prompt, context_documents=documents)
-    print(story.length)
     print(story.text)
-    # audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
-    # video = get_videos_from_subreddit()
-    # combine_video_and_audio(input_video_file=video, input_audio_file=audio)
+    audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    video = get_videos_from_subreddit()
+    combine_video_and_audio(input_video_file=video, input_audio_file=audio)
 
 
 if __name__ == "__main__":

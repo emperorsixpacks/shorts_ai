@@ -7,4 +7,6 @@ ibm-credentials.env
 *.pyc
 __pycache__/
 export_env
+demo.py
+hello.wav
 

@@ -107,3 +107,5 @@ class AWSSettings(BaseConfig):
     aws_secret_key: str = None
     aws_access_key: str = None
     s3_bucket: str = None
+
+
