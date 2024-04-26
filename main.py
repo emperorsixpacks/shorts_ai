@@ -6,11 +6,15 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from enum import StrEnum
 from datetime import datetime
+from io import BytesIO
 
 import requests
 import wikipediaapi
 import praw
 from ffmpeg import FFmpeg
+from mutagen import mp3
+from mutagen.mp3 import MP3
+
 
 import boto3
 from botocore.exceptions import NoCredentialsError
@@ -50,7 +54,6 @@ file_handler.setFormatter(formatter)
 console_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
-
 
 
 reddit_settings = RedditSettings()
@@ -254,9 +257,7 @@ def upload_file_to_s3(media_file: MediaFile, file_content):
         logger.info("File uploaded successfully")
         return True
     else:
-        logger.warning(
-            "Failed to upload file. Status code: {}".format(response.status_code)
-        )
+        logger.warning("Failed to upload file. Status code: %s", response.status_code)
         return False
 
 
@@ -280,7 +281,7 @@ def get_videos_from_subreddit():
 
     # Get video submissions
     videos = []
-    for submission in subreddit.hot(limit=40):
+    for submission in subreddit.hot(limit=100):
         if (
             submission.secure_media is not None
             and submission.secure_media.get("reddit_video") is not None
@@ -292,7 +293,7 @@ def get_videos_from_subreddit():
             scrubber_media_url = video_data.get("fallback_url")
 
             if (
-                20 <= duration <= 60
+                duration <= 15 >=10
                 and height >= 1000
                 and width >= 1000
                 and scrubber_media_url
@@ -305,7 +306,7 @@ def get_videos_from_subreddit():
                     }
                 )
     logger.info("Videos retrieved successfully")
-    return random.choice(videos)
+    return random.sample(videos, k=4)
 
 
 def combine_video_and_audio(input_video_file: str, input_audio_file: MediaFile):
@@ -339,7 +340,20 @@ def combine_video_and_audio(input_video_file: str, input_audio_file: MediaFile):
     ffmpeg.execute()
     logger.info("Video and audio combined successfully")
 
- 
+
+def get_mp3_audio_length_from_bytes(audio_bytes: bytes) -> int:
+    """
+    Calculate the length of an MP3 audio file in seconds from its byte representation.
+
+    Args:
+        audio_bytes (bytes): The byte representation of the MP3 audio file.
+
+    Returns:
+        float: The length of the MP3 audio file in seconds.
+    """
+    audio_stream = BytesIO(audio_bytes)
+    return int(MP3(audio_stream).info.length)
+
 
 def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
     """
@@ -353,26 +367,27 @@ def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
     Returns:
         MediaFile | None: The converted audio file if successful, None otherwise.
     """
-  
+
     logger.info("Converting text to audio")
     media_file = MediaFile(name=name, file_type=SupportedMediaFileType.AUDIO)
-    data = {
-        "msg": text.text,
-        "lang":"Matthew",
-        "source":"ttsmp3"
-    }
-    generated_audio = requests.post("https://ttsmp3.com/makemp3_new.php", data=data, timeout=60).json()
+    data = {"msg": text.text, "lang": "Matthew", "source": "ttsmp3"}
+    generated_audio = requests.post(
+        "https://ttsmp3.com/makemp3_new.php", data=data, timeout=60
+    ).json()
     media_file_url = generate_presigned_url(
         client,
         AWSS3Method.PUT,
         media_file=media_file,
     )
     media_file.url = media_file_url
-    audio_content = lambda url : requests.get(url, timeout=60).content
+    audio_content = lambda url: requests.get(url, timeout=60).content
+    media_file.duration = get_mp3_audio_length_from_bytes(
+        audio_content(generated_audio["URL"])
+    )
     logger.info("Generating audio")
     result = upload_file_to_s3(
         media_file=media_file,
-        file_content= audio_content(generated_audio["URL"]),
+        file_content=audio_content(generated_audio["URL"]),
     )
     if not result:
         logger.warning("Failed to upload audio to S3")
@@ -398,7 +413,12 @@ def extract_answer(llm_output):
     """
     llm_output_list = llm_output.split("\n")
     result_match = re.findall(r"(True|False)", llm_output_list[0])
-    return result_match[0]
+    if result_match[0] == "True":
+        return True
+    elif result_match[0] == "False":
+        return False
+    else:
+        return None
 
 
 def check_user_prompt(text: str, valid_documents: List[Document]) -> bool:
@@ -421,13 +441,13 @@ def check_user_prompt(text: str, valid_documents: List[Document]) -> bool:
         top_p=0.2,
         top_k=10,
     )
-    system_message = open_prompt_txt("openai_prompt.txt")
+    system_message = open_prompt_txt("validation_prompt.txt")
     messages = [
         SystemMessage(content=system_message),
         HumanMessage(content=f"user text: {text} \n docuemnts: {valid_documents}"),
     ]
     llm_output = model.invoke(messages).content
-    return bool(extract_answer(llm_output=llm_output))
+    return extract_answer(llm_output=llm_output)
 
 
 def generate_story(user_prompt: str, context_documents: List[Document]) -> Story:
@@ -594,15 +614,17 @@ def main():
             "jfk_(film)",
         ],
     )
-    checked_prompt = check_user_prompt(text=prompt, valid_documents=documents)
-    if not checked_prompt:
-        print("mate, this never happened or I am to old to remember 🥲")
-        return
-    story = generate_story(user_prompt=prompt, context_documents=documents)
-    print(story.text)
-    audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    # checked_prompt = check_user_prompt(text=prompt, valid_documents=documents)
+    # if not checked_prompt:
+    #     print("mate, this never happened or I am to old to remember 🥲")
+    #     return
+    # print(checked_prompt)
+    # story = generate_story(user_prompt=prompt, context_documents=documents)
+    # print(story.text)
+    # audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
     video = get_videos_from_subreddit()
-    combine_video_and_audio(input_video_file=video, input_audio_file=audio)
+    print(video)
+    # combine_video_and_audio(input_video_file=video, input_audio_file=audio)
 
 
 if __name__ == "__main__":
