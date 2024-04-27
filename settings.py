@@ -81,20 +81,6 @@ class LLMSettings(BaseConfig):
     deepinfra_api_key: str = None
 
 
-class TxtSpeechSettings(BaseConfig):
-    """
-    Settings for IBM Watson Text to Speech API credentials.
-
-    Attributes:
-        ibm_api_key (str): API key for the IBM Watson Text to Speech API.
-        ibm_link (str): Link to the IBM Watson Text to Speech API.
-    """
-
-    ibm_api_key: str = None
-    ibm_url: str = None
-    ibm_service_name: str = None
-
-
 class AWSSettings(BaseConfig):
     """
     Settings for AWS credentials.
