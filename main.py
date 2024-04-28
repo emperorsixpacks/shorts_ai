@@ -1,7 +1,7 @@
 import re
 import random
 import logging
-from typing import List
+from typing import List, Dict
 from dataclasses import dataclass, field
 from functools import lru_cache
 from enum import StrEnum
@@ -12,7 +12,6 @@ import requests
 import wikipediaapi
 import praw
 from ffmpeg import FFmpeg
-from mutagen import mp3
 from mutagen.mp3 import MP3
 
 
@@ -37,7 +36,6 @@ from settings import (
     RedditSettings,
     RedisSettings,
     EmbeddingSettings,
-    TxtSpeechSettings,
     LLMSettings,
     HuggingFaceHubSettings,
     AWSSettings,
@@ -59,7 +57,6 @@ logger.addHandler(console_handler)
 reddit_settings = RedditSettings()
 redis_settings = RedisSettings()
 embeddings_settings = EmbeddingSettings()
-txt_speech_settings = TxtSpeechSettings()
 llm_settings = LLMSettings()
 hf_hub_settings = HuggingFaceHubSettings()
 aws_settings = AWSSettings()
@@ -121,6 +118,7 @@ class MediaFile:
     size: int = None
     duration: int = None
     url: str = None
+    author: str = None
     timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()))
 
     def __post_init__(self):
@@ -261,7 +259,7 @@ def upload_file_to_s3(media_file: MediaFile, file_content):
         return False
 
 
-def get_videos_from_subreddit():
+def get_videos_from_subreddit(number_of_videos: int = 4):
     """
     Get videos from a specific subreddit using the PRAW library.
 
@@ -280,8 +278,8 @@ def get_videos_from_subreddit():
     subreddit = reddit.subreddit("oddlysatisfying")
 
     # Get video submissions
-    videos = []
-    for submission in subreddit.hot(limit=100):
+    videos : List[Dict[str, str]] = []
+    for submission in subreddit.hot(limit=500):
         if (
             submission.secure_media is not None
             and submission.secure_media.get("reddit_video") is not None
@@ -293,7 +291,7 @@ def get_videos_from_subreddit():
             scrubber_media_url = video_data.get("fallback_url")
 
             if (
-                duration <= 15 >=10
+                duration == 10
                 and height >= 1000
                 and width >= 1000
                 and scrubber_media_url
@@ -306,7 +304,16 @@ def get_videos_from_subreddit():
                     }
                 )
     logger.info("Videos retrieved successfully")
-    return random.sample(videos, k=4)
+    videos = random.sample(videos, k=4)
+    return [
+        MediaFile(
+            name=video.get("title"),
+            file_type=SupportedMediaFileType.VIDEO,
+            url=video.get("url"),
+            author=video.get("author")
+        )
+        for video in videos
+    ]
 
 
 def combine_video_and_audio(input_video_file: str, input_audio_file: MediaFile):
@@ -605,7 +612,9 @@ def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Docume
 
 
 def main():
-    prompt = "Write on what happened to John F. Kennedy's brain after he was killed"
+    prompt = (
+        "Write on what happened to John F. Kennedy's brain after he was assasinated"
+    )
     documents = return_documents(
         prompt,
         index_names=[
@@ -618,10 +627,9 @@ def main():
     # if not checked_prompt:
     #     print("mate, this never happened or I am to old to remember 🥲")
     #     return
-    # print(checked_prompt)
     # story = generate_story(user_prompt=prompt, context_documents=documents)
-    # print(story.text)
     # audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    # number_of_videos = audio.duration // 10
     video = get_videos_from_subreddit()
     print(video)
     # combine_video_and_audio(input_video_file=video, input_audio_file=audio)
