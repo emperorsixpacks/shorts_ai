@@ -1,4 +1,21 @@
-from dataclasses import dataclass
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+from dataclasses import dataclass, field
+from enum import StrEnum
+from datetime import datetime
+
+if TYPE_CHECKING:
+    from settings import AWSSettings
+
+
+class SupportedMediaFileType(StrEnum):
+    """
+    Supported media file types for downloading and converting
+    """
+
+    VIDEO = "mp4"
+    AUDIO = "wav"
 
 
 @dataclass
@@ -38,7 +55,7 @@ class MediaFile:
                 return f"audio_{self.name}-{self.timestamp}.{self.file_type}"
 
     @property
-    def location(self):
+    def location(self, aws_settings: AWSSettings):
         """
         Returns the location of the media file.
 
@@ -49,16 +66,6 @@ class MediaFile:
         if self.name is None:
             return None
         return f"{aws_settings.fastly_url}{self.return_formated_name()}"
-
-
-
-class SupportedMediaFileType(StrEnum):
-    """
-    Supported media file types for downloading and converting
-    """
-
-    VIDEO = "mp4"
-    AUDIO = "wav"
 
 
 class AWSS3Method(StrEnum):
