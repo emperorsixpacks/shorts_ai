@@ -2,18 +2,15 @@ import re
 import random
 import logging
 from typing import List, Dict
-from dataclasses import dataclass, field
+
 from functools import lru_cache
-from enum import StrEnum
-from datetime import datetime
 from io import BytesIO
 
 import requests
 import wikipediaapi
 import praw
-from ffmpeg import FFmpeg
 from mutagen.mp3 import MP3
-
+import ffmpeg
 
 import boto3
 from botocore.exceptions import NoCredentialsError
@@ -40,6 +37,9 @@ from settings import (
     HuggingFaceHubSettings,
     AWSSettings,
 )
+
+from utils import MediaFile, Story, WikiPage, AWSS3Method, SupportedMediaFileType
+from py_ffmpeg.main import PyFFmpeg, InputFile
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -82,117 +82,6 @@ def load_embeddings_model():
 
 
 embeddings = load_embeddings_model()
-
-
-class SupportedMediaFileType(StrEnum):
-    """
-    Supported media file types for downloading and converting
-    """
-
-    VIDEO = "mp4"
-    AUDIO = "wav"
-
-
-class AWSS3Method(StrEnum):
-    """
-    Supported AWS S3 methods
-    """
-
-    PUT = "put_object"
-    GET = "get_object"
-
-
-@dataclass
-class MediaFile:
-    """
-    Dataclass for storing metadata about a media file
-
-    name: name of the file
-    size: size of the file in bytes
-    duration: duration of the media file in seconds
-    file_type: file type of the media file (e.g. "mp4", "wav")
-    """
-
-    name: str
-    file_type: SupportedMediaFileType
-    size: int = None
-    duration: int = None
-    url: str = None
-    author: str = None
-    timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()))
-
-    def __post_init__(self):
-        self.name = self.name.replace(" ", "_").lower()
-
-    def return_formated_name(self):
-        """
-        Returns a formatted name for the media file based on the file type.
-
-        Returns:
-            str: The formatted name of the media file.
-        """
-        match self.file_type:
-            case SupportedMediaFileType.VIDEO:
-                return f"video_{self.name}-{self.timestamp}.{self.file_type}"
-
-            case SupportedMediaFileType.AUDIO:
-                return f"audio_{self.name}-{self.timestamp}.{self.file_type}"
-
-    @property
-    def location(self):
-        """
-        Returns the location of the media file.
-
-        Returns:
-            str: The location of the media file.
-            None: If the name of the media file is None.
-        """
-        if self.name is None:
-            return None
-        return f"{aws_settings.fastly_url}{self.return_formated_name()}"
-
-
-@dataclass
-class Story:
-    """
-    Dataclass for storing metadata about a story.
-
-    Attributes:
-        prompt (str): The prompt for the story.
-        text (str): The story text.
-    """
-
-    prompt: str
-    text: str
-
-    @property
-    def length(self) -> int:
-        """
-        Returns the length of the story in words.
-
-        Returns:
-            int: The length of the story in words.
-        """
-        return len(self.text.split())
-
-
-@dataclass
-class WikiPage:
-    """
-    Dataclass for storing metadata about a Wikipedia page
-
-    page_title: title of the Wikipedia page (in lower case)
-    text: text content of the Wikipedia page
-    """
-
-    page_title: str
-    text: str
-
-    def __post_init__(self):
-        self.page_title = self.page_title.lower()
-
-    def __str__(self):
-        return self.page_title
 
 
 def generate_presigned_url(
@@ -278,7 +167,7 @@ def get_videos_from_subreddit(number_of_videos: int = 4):
     subreddit = reddit.subreddit("oddlysatisfying")
 
     # Get video submissions
-    videos : List[Dict[str, str]] = []
+    videos: List[Dict[str, str]] = []
     for submission in subreddit.hot(limit=500):
         if (
             submission.secure_media is not None
@@ -291,7 +180,7 @@ def get_videos_from_subreddit(number_of_videos: int = 4):
             scrubber_media_url = video_data.get("fallback_url")
 
             if (
-                duration == 10
+                10 <= duration <= 15
                 and height >= 1000
                 and width >= 1000
                 and scrubber_media_url
@@ -304,48 +193,44 @@ def get_videos_from_subreddit(number_of_videos: int = 4):
                     }
                 )
     logger.info("Videos retrieved successfully")
-    videos = random.sample(videos, k=4)
+    videos = random.sample(videos, k=number_of_videos + 1)
     return [
         MediaFile(
             name=video.get("title"),
             file_type=SupportedMediaFileType.VIDEO,
             url=video.get("url"),
-            author=video.get("author")
+            author=video.get("author"),
         )
         for video in videos
     ]
 
 
-def combine_video_and_audio(input_video_file: str, input_audio_file: MediaFile):
+def combine_video_and_audio(
+    input_video_files: List[MediaFile],
+    input_audio_file: MediaFile,
+    output_filename: str = "./output.mp4",
+) -> MediaFile:
     """
-    Combines a video file and an audio file into a single MP4 file using FFmpeg.
+    Combines multiple video files with a single audio file into a single MP4 using FFmpeg.
 
     Args:
-        video_file (str): The path to the video file.
-        audio_file (MediaFile): The audio file to be combined with the video.
+        input_video_files: A list of dictionaries, where each dictionary represents a video file
+            with a "url" key containing the video's location.
+        output_filename: The desired filename for the combined MP4 output (default: "output.mp4").
 
     Returns:
         None
-
-    Raises:
-        None
     """
     logger.info("Combining video and audio")
-    # print(input_audio_file.location)
-    ffmpeg = (
-        FFmpeg()
-        .option("y")
-        .input(input_video_file["url"], stream_loop=-1)
-        .input(input_audio_file.location)
-        .output(
-            "output.mp4",
-            options={"codec:a": "libmp3lame", "filter:v": "scale=-1:1080"},
-            map=["0:v:0", "1:a:0"],
-            shortest=None,
-        )
+    input_videos = [InputFile(media_file=video) for video in input_video_files]
+    input_audio = InputFile(media_file=input_audio_file)
+    process = PyFFmpeg(
+        video_file=input_videos, audio_file=input_audio, output_location=output_filename
     )
-    ffmpeg.execute()
-    logger.info("Video and audio combined successfully")
+
+    process = process.concatinate_video().trim_video().execute()
+    logger.info("Successfully Combining video and audio")
+    return process
 
 
 def get_mp3_audio_length_from_bytes(audio_bytes: bytes) -> int:
@@ -400,14 +285,14 @@ def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
         logger.warning("Failed to upload audio to S3")
         return None
     logger.info("Audio converted successfully")
-    return media_file
+    return media_file.set_location(aws_settings=aws_settings)
 
 
-def open_prompt_txt(file: str) -> str:
+def open_prompt_txt(prompt_txt: str) -> str:
     """
     Reads and returns the content of the file 'prompt.txt' as a string.
     """
-    with open(file, "r", encoding="utf-8") as f:
+    with open(prompt_txt, "r", encoding="utf-8") as f:
         return f.read()
 
 
@@ -459,14 +344,14 @@ def check_user_prompt(text: str, valid_documents: List[Document]) -> bool:
 
 def generate_story(user_prompt: str, context_documents: List[Document]) -> Story:
     """
-    Generates a story question based on the user prompt and context documents.
+    Generates a story based on the user prompt and context documents.
 
     Parameters:
-        user_prompt (str): The user prompt for generating the story question.
+        user_prompt (str): The user prompt for generating the story.
         context_documents (List[Document]): A list of documents providing context for the story.
 
     Returns:
-        str: The generated story question.
+        str: The generated story.
     """
     logger.info("Generating story")
     presence_penalty = AI21PenaltyData(scale=4.9)
@@ -489,7 +374,7 @@ def generate_story(user_prompt: str, context_documents: List[Document]) -> Story
     )
     chain = LLMChain(llm=llm, prompt=final_prompt)
     question = chain.invoke({"user": user_prompt, "documents": context_documents})
-    logger.info("Story question generated successfully")
+    logger.info("Story generated successfully")
     return Story(prompt=user_prompt, text=question["text"])
 
 
@@ -629,14 +514,18 @@ def main():
     #     return
     # story = generate_story(user_prompt=prompt, context_documents=documents)
     # audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    # print(audio)
     # number_of_videos = audio.duration // 10
-    video = get_videos_from_subreddit()
-    print(video)
-    # combine_video_and_audio(input_video_file=video, input_audio_file=audio)
+    videos = get_videos_from_subreddit(number_of_videos=5)
+    # print(videos)
+    audio = MediaFile(name="write_on_what_happened_to_john_f._kennedy's_brain_after_he_was_assasinated", file_type=SupportedMediaFileType.AUDIO, size=None, url="https://ebun.global.ssl.fastly.net/audio_write_on_what_happened_to_john_f._kennedy's_brain_after_he_was_assasinated-1714960028.wav", author=None, timestamp=1714960028)
+    combine_video_and_audio(input_audio_file=audio, input_video_files=videos)
 
 
 if __name__ == "__main__":
     main()
+    # file = MediaFile(name='rc_car_in_a_dog_park', file_type=SupportedMediaFileType.VIDEO, size=None, url='https://v.redd.it/x2s3x8cxbqsc1/DASH_1080.mp4?source=fallback', author='nomar_ramon', timestamp=1714957608).set_duration()
+    # print(file.duration)
 
 
 # tokens = return_ner_tokens(prompt)

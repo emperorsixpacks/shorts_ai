@@ -9,4 +9,5 @@ __pycache__/
 export_env
 demo.py
 hello.wav
-
+activate
+.activate.swp

@@ -1,9 +1,10 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Self
 
 from dataclasses import dataclass, field
 from enum import StrEnum
 from datetime import datetime
+import ffmpeg
 
 if TYPE_CHECKING:
     from settings import AWSSettings
@@ -32,13 +33,13 @@ class MediaFile:
     name: str
     file_type: SupportedMediaFileType
     size: int = None
-    duration: int = None
     url: str = None
     author: str = None
     timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()))
 
     def __post_init__(self):
-        self.name = self.name.replace(" ", "_").lower()
+        self.name: str = self.name.replace(" ", "_").lower()
+        self.duration: int = None
 
     def return_formated_name(self):
         """
@@ -54,8 +55,7 @@ class MediaFile:
             case SupportedMediaFileType.AUDIO:
                 return f"audio_{self.name}-{self.timestamp}.{self.file_type}"
 
-    @property
-    def location(self, aws_settings: AWSSettings):
+    def set_location(self, aws_settings: AWSSettings) -> Self:
         """
         Returns the location of the media file.
 
@@ -65,7 +65,28 @@ class MediaFile:
         """
         if self.name is None:
             return None
-        return f"{aws_settings.fastly_url}{self.return_formated_name()}"
+        self.url = f"{aws_settings.fastly_url}{self.return_formated_name()}"
+        return self
+
+    def set_duration(self, url: str = None) -> Self:
+        """
+        Retrieves and returns the duration of the media file.
+
+        Args:
+            url (str, optional): The URL of the media file. If not provided, uses the location attribute of the media file.
+
+        Returns:
+            int: The duration of the media file in seconds.
+            None: If the location attribute is None or the media file cannot be probed.
+        """
+
+        if url is None:
+            url = self.url
+        if self.url is None:
+            return None
+
+        self.duration = ffmpeg.probe(url)["format"]["duration"]
+        return self
 
 
 class AWSS3Method(StrEnum):
