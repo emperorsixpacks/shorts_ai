@@ -1,4 +1,5 @@
 from typing import List, TypeVar, Self
+import logging
 
 import ffmpeg
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
@@ -61,24 +62,23 @@ class PyFFmpeg(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     video: List[InputFile]
     audio: InputFile
-    output_location: str
+    output_location: MediaFile
     overwrite: bool = Field(default=True)
     filter_stream: FilterableStream = Field(init=False, default=None)
-    
+
     @field_validator("video", mode="after")
     def reduce_video_quality(self) -> List[FilterableStream]:
         video_streams = []
         for video in self.video:
-            video_stream = video.stream        
+            video_stream = video.stream
             video_stream = ffmpeg.filter(video_stream, "scale", 406, 720)
-            video_stream = ffmpeg.filter(video_stream, "setsar",1,1)
+            video_stream = ffmpeg.filter(video_stream, "setsar", 1, 1)
             video_streams.append(video_stream)
-        
+
         self.video.clear()
         self.video.extend(video_streams)
-        
+
         return self.video
-    
 
     def concatinate_video(self) -> Self:
         """
@@ -87,7 +87,9 @@ class PyFFmpeg(BaseModel):
         Returns:
             Self: The modified object with the concatenated video stream.
         """
-        self.filter_stream = ffmpeg.concat(*[video.stream for video in self.video], v=1, a=0)
+        self.filter_stream = ffmpeg.concat(
+            *[video.stream for video in self.video], v=1, a=0
+        )
         return self
 
     def trim_video(self, end: int = None) -> Self:
@@ -119,9 +121,16 @@ class PyFFmpeg(BaseModel):
         """
 
         process = ffmpeg.output(
-            self.filter_stream, self.audio_file.stream, "output.mp4", shortest=None
+            self.filter_stream,
+            self.audio_file.stream,
+            self.output_location.url,
+            shortest=None,
         )
+        try:
+            process.run(overwrite_output=self.overwrite)
 
-        process.run(overwrite_output=self.overwrite)
+        except ffmpeg.Error() as e:
+            # add loggin here
+            return none
 
         return self.output_location

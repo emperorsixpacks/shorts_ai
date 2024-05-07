@@ -10,7 +10,6 @@ import requests
 import wikipediaapi
 import praw
 from mutagen.mp3 import MP3
-import ffmpeg
 
 import boto3
 from botocore.exceptions import NoCredentialsError
@@ -225,7 +224,7 @@ def combine_video_and_audio(
     input_videos = [InputFile(media_file=video) for video in input_video_files]
     input_audio = InputFile(media_file=input_audio_file)
     process = PyFFmpeg(
-        video_file=input_videos, audio_file=input_audio, output_location=output_filename
+        video=input_videos, audio=input_audio, output_location=output_filename
     )
 
     process = process.concatinate_video().trim_video().execute()
@@ -508,18 +507,22 @@ def main():
             "jfk_(film)",
         ],
     )
-    # checked_prompt = check_user_prompt(text=prompt, valid_documents=documents)
-    # if not checked_prompt:
-    #     print("mate, this never happened or I am to old to remember 🥲")
-    #     return
-    # story = generate_story(user_prompt=prompt, context_documents=documents)
-    # audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
-    # print(audio)
-    # number_of_videos = audio.duration // 10
-    videos = get_videos_from_subreddit(number_of_videos=5)
-    # print(videos)
-    audio = MediaFile(name="write_on_what_happened_to_john_f._kennedy's_brain_after_he_was_assasinated", file_type=SupportedMediaFileType.AUDIO, size=None, url="https://ebun.global.ssl.fastly.net/audio_write_on_what_happened_to_john_f._kennedy's_brain_after_he_was_assasinated-1714960028.wav", author=None, timestamp=1714960028)
-    combine_video_and_audio(input_audio_file=audio, input_video_files=videos)
+    checked_prompt = check_user_prompt(text=prompt, valid_documents=documents)
+    if not checked_prompt:
+        print("mate, this never happened or I am to old to remember 🥲")
+        return
+    story = generate_story(user_prompt=prompt, context_documents=documents)
+    audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    number_of_videos = audio.duration // 10
+    videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
+    output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
+    output_file.url = generate_presigned_url(
+        client=aws_client,
+        method=AWSS3Method.PUT,
+        media_file=output_file,
+        expiration=600,
+    )
+    combine_video_and_audio(input_audio_file=audio, input_video_files=videos, output_file=output_file)
 
 
 if __name__ == "__main__":

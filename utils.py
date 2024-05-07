@@ -35,7 +35,7 @@ class MediaFile:
     size: int = None
     url: str = None
     author: str = None
-    timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()))
+    timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()), init=False)
 
     def __post_init__(self):
         self.name: str = self.name.replace(" ", "_").lower()
