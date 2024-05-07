@@ -53,31 +53,31 @@ class PyFFmpeg(BaseModel):
     A class for generating a video file by concatenating multiple video files and audio file using FFmpeg.
 
     Attributes:
-        video_file (List[InputFile]): A list of video input files.
+        video (List[InputFile]): A list of video input files.
         audio_file (InputFile): The audio input file.
         overwrite (bool): If True, will overwrite existing output file. (default: True)
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    video_file: List[InputFile]
-    audio_file: InputFile
+    video: List[InputFile]
+    audio: InputFile
     output_location: str
     overwrite: bool = Field(default=True)
     filter_stream: FilterableStream = Field(init=False, default=None)
     
-    @field_validator("video_file", mode="after")
+    @field_validator("video", mode="after")
     def reduce_video_quality(self) -> List[FilterableStream]:
         video_streams = []
-        for video in self.video_file:
+        for video in self.video:
             video_stream = video.stream        
             video_stream = ffmpeg.filter(video_stream, "scale", 406, 720)
             video_stream = ffmpeg.filter(video_stream, "setsar",1,1)
             video_streams.append(video_stream)
         
-        self.video_file.clear()
-        self.video_file.extend(video_streams)
+        self.video.clear()
+        self.video.extend(video_streams)
         
-        return self.video_file
+        return self.video
     
 
     def concatinate_video(self) -> Self:
@@ -87,15 +87,7 @@ class PyFFmpeg(BaseModel):
         Returns:
             Self: The modified object with the concatenated video stream.
         """
-
-        video_streams = []
-        for video in self.video_file:
-            video_stream = video.stream        
-            video_stream = ffmpeg.filter(video_stream, "scale", 406, 720)
-            video_stream = ffmpeg.filter(video_stream, "setsar",1,1)
-            video_streams.append(video_stream)
-
-        self.filter_stream = ffmpeg.concat(*video_streams, v=1, a=0)
+        self.filter_stream = ffmpeg.concat(*[video.stream for video in self.video], v=1, a=0)
         return self
 
     def trim_video(self, end: int = None) -> Self:
