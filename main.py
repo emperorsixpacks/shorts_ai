@@ -2,6 +2,7 @@ import re
 import random
 import logging
 from typing import List, Dict
+from tempfile import NamedTemporaryFile
 
 from functools import lru_cache
 from io import BytesIO
@@ -12,8 +13,6 @@ import praw
 from mutagen.mp3 import MP3
 
 import boto3
-from botocore.exceptions import NoCredentialsError
-
 
 from huggingface_hub import InferenceClient
 
@@ -37,7 +36,14 @@ from settings import (
     AWSSettings,
 )
 
-from utils import MediaFile, Story, WikiPage, AWSS3Method, SupportedMediaFileType
+from utils import (
+    MediaFile,
+    Story,
+    WikiPage,
+    AWSS3Method,
+    SupportedMediaFileType,
+    upload_file_to_s3,
+)
 from py_ffmpeg.main import PyFFmpeg, InputFile
 
 logger = logging.getLogger(__name__)
@@ -81,70 +87,6 @@ def load_embeddings_model():
 
 
 embeddings = load_embeddings_model()
-
-
-def generate_presigned_url(
-    client,
-    method: AWSS3Method,
-    *,
-    media_file: MediaFile,
-    expiration: int = 120,
-) -> MediaFile:
-    """
-    Generates a presigned URL for an S3 object.
-
-    Args:
-        client (boto3.client): The S3 client.
-        method (AWSS3Method): The HTTP method to use for the presigned URL.
-        object_key (str): The key of the S3 object.
-        file_type (SupportedMediaFileType): The file type of the S3 object.
-        expiration (int, optional): The expiration time of the presigned URL in seconds. Defaults to 36.
-
-    Returns:
-        MediaFile: The media file with the generated presigned URL.
-
-    Raises:
-        NoCredentialsError: If AWS credentials are not available.
-    """
-
-    logger.info("Generating presigned URL")
-
-    try:
-        url = client.generate_presigned_url(
-            method,
-            Params={
-                "Bucket": aws_settings.s3_bucket,
-                "Key": media_file.return_formated_name(),
-            },
-            ExpiresIn=expiration,
-        )
-
-        logger.info("Presigned URL generated successfully")
-        return url
-    except NoCredentialsError:
-        logger.error("No AWS credentials available")
-        return None
-
-
-def upload_file_to_s3(media_file: MediaFile, file_content):
-    """
-    Uploads file content to a specified S3 URL using PUT request.
-
-    Parameters:
-    url (str): The S3 URL to upload the file to.
-    file_content (bytes): The content of the file to upload.
-
-    Returns:
-    None
-    """
-    logger.info("Uploading file to S3")
-    response = requests.put(media_file.url, data=file_content, timeout=60)
-    if response.status_code == 200:
-        logger.info("File uploaded successfully")
-        return True
-    else:
-        logger.warning("Failed to upload file. Status code: %s", response.status_code)
-        return False
 
 
 def get_videos_from_subreddit(number_of_videos: int = 4):
@@ -207,7 +149,7 @@ def get_videos_from_subreddit(number_of_videos: int = 4):
 def combine_video_and_audio(
     input_video_files: List[MediaFile],
     input_audio_file: MediaFile,
-    output_filename: str = "./output.mp4",
+    output_file: MediaFile,
 ) -> MediaFile:
     """
     Combines multiple video files with a single audio file into a single MP4 using FFmpeg.
@@ -215,7 +157,7 @@ def combine_video_and_audio(
     Args:
         input_video_files: A list of dictionaries, where each dictionary represents a video file
             with a "url" key containing the video's location.
-        output_filename: The desired filename for the combined MP4 output (default: "output.mp4").
+        output_file The desired file for the combined MP4 output.
 
     Returns:
         None
@@ -224,26 +166,16 @@ def combine_video_and_audio(
     input_videos = [InputFile(media_file=video) for video in input_video_files]
     input_audio = InputFile(media_file=input_audio_file)
     process = PyFFmpeg(
-        video=input_videos, audio=input_audio, output_location=output_filename
+        video=input_videos,
+        audio=input_audio,
+        output_location=output_file,
+        aws_client=aws_client,
+        aws_settings=aws_settings,
     )
 
     process = process.concatinate_video().trim_video().execute()
     logger.info("Successfully Combining video and audio")
     return process
-
-
-def get_mp3_audio_length_from_bytes(audio_bytes: bytes) -> int:
-    """
-    Calculate the length of an MP3 audio file in seconds from its byte representation.
-
-    Args:
-        audio_bytes (bytes): The byte representation of the MP3 audio file.
-
-    Returns:
-        float: The length of the MP3 audio file in seconds.
-    """
-    audio_stream = BytesIO(audio_bytes)
-    return int(MP3(audio_stream).info.length)
 
 
 def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
@@ -262,29 +194,31 @@ def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
     logger.info("Converting text to audio")
     media_file = MediaFile(name=name, file_type=SupportedMediaFileType.AUDIO)
     data = {"msg": text.text, "lang": "Matthew", "source": "ttsmp3"}
-    generated_audio = requests.post(
+    audio_url = requests.post(
         "https://ttsmp3.com/makemp3_new.php", data=data, timeout=60
-    ).json()
-    media_file_url = generate_presigned_url(
-        client,
-        AWSS3Method.PUT,
-        media_file=media_file,
-    )
-    media_file.url = media_file_url
-    audio_content = lambda url: requests.get(url, timeout=60).content
-    media_file.duration = get_mp3_audio_length_from_bytes(
-        audio_content(generated_audio["URL"])
-    )
-    logger.info("Generating audio")
-    result = upload_file_to_s3(
-        media_file=media_file,
-        file_content=audio_content(generated_audio["URL"]),
-    )
-    if not result:
-        logger.warning("Failed to upload audio to S3")
-        return None
+    ).json()["URL"]
+    media_file.url = audio_url
+    with NamedTemporaryFile() as tempfile:
+        r = requests.get(audio_url, stream=True, timeout=60)
+        if r.status_code == 200:
+            with open(tempfile.name, "wb") as f:
+                for chunk in r.iter_content(chunk_size=1024):
+                    f.write(chunk)
+        else:
+            logger.warning("Failed to download audio from TTSMP3")
+            return None
+        logger.info("Uploading audio to S3")
+        upload = upload_file_to_s3(
+            client,
+            media_file=media_file,
+            file_location=tempfile.name,
+            aws_settings=aws_settings,
+        )
+        if not upload:
+            logger.warning("Failed to upload audio to S3")
+            return None
     logger.info("Audio converted successfully")
-    return media_file.set_location(aws_settings=aws_settings)
+    return media_file.set_duration()
 
 
 def open_prompt_txt(prompt_txt: str) -> str:
@@ -401,15 +335,9 @@ def wiki_search(query: str):
         query (str): The search query to be used for the Wikipedia API.
 
     Returns:
-        list: A list of page keys retrieved from the Wikipedia API response.
-
-    Raises:
-        None
-
-    Examples:
-        >>> wiki_search("Python")
-        ['/wiki/Python', '/wiki/Python_(programming_language)', '/wiki/Python_(film)']
+        list: A list of page keys extracted from the response of the Wikipedia API.
     """
+
     params = {
         "action": "query",
         "format": "json",
@@ -513,16 +441,12 @@ def main():
         return
     story = generate_story(user_prompt=prompt, context_documents=documents)
     audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
-    number_of_videos = audio.duration // 10
+    number_of_videos = int(audio.duration // 10)
     videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
     output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
-    output_file.url = generate_presigned_url(
-        client=aws_client,
-        method=AWSS3Method.PUT,
-        media_file=output_file,
-        expiration=600,
+    combine_video_and_audio(
+        input_audio_file=audio, input_video_files=videos, output_file=output_file
     )
-    combine_video_and_audio(input_audio_file=audio, input_video_files=videos, output_file=output_file)
 
 
 if __name__ == "__main__":
@@ -558,4 +482,4 @@ if __name__ == "__main__":
 # print(mefia_file.return_formated_name())
 
 
-# # TODO get media information
+# TODO - setup a loop to chack the user prompt and check if it is valid

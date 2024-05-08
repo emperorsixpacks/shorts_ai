@@ -1,9 +1,15 @@
+"""
+Utility functions for common tasks in the project.
+"""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING, Self
 
 from dataclasses import dataclass, field
 from enum import StrEnum
 from datetime import datetime
+
+from botocore.exceptions import ClientError
 import ffmpeg
 
 if TYPE_CHECKING:
@@ -55,20 +61,8 @@ class MediaFile:
             case SupportedMediaFileType.AUDIO:
                 return f"audio_{self.name}-{self.timestamp}.{self.file_type}"
 
-    def set_location(self, aws_settings: AWSSettings) -> Self:
-        """
-        Returns the location of the media file.
 
-        Returns:
-            str: The location of the media file.
-            None: If the name of the media file is None.
-        """
-        if self.name is None:
-            return None
-        self.url = f"{aws_settings.fastly_url}{self.return_formated_name()}"
-        return self
-
-    def set_duration(self, url: str = None) -> Self:
+    def set_duration(self) -> Self:
         """
         Retrieves and returns the duration of the media file.
 
@@ -79,14 +73,11 @@ class MediaFile:
             int: The duration of the media file in seconds.
             None: If the location attribute is None or the media file cannot be probed.
         """
-
-        if url is None:
-            url = self.url
-        if self.url is None:
-            return None
-
-        self.duration = ffmpeg.probe(url)["format"]["duration"]
-        return self
+            
+        if self.url is not None:
+            self.duration = float(ffmpeg.probe(self.url)["format"]["duration"])
+            return self
+        return None
 
 
 class AWSS3Method(StrEnum):
@@ -139,3 +130,33 @@ class WikiPage:
 
     def __str__(self):
         return self.page_title
+
+
+
+
+def upload_file_to_s3(
+    aws_client,
+    *,
+    media_file: MediaFile,
+    file_location,
+    aws_settings: AWSSettings,
+):
+    """
+    Uploads file content to a specified S3 URL using PUT request.
+
+    Parameters:
+    url (str): The S3 URL to upload the file to.
+    file_content (bytes): The content of the file to upload.
+
+    Returns:
+    None
+    """
+    try:
+        with open(file_location, "rb") as file:
+            aws_client.upload_fileobj(
+                Fileobj=file, Bucket=aws_settings.s3_bucket, Key=media_file.name
+            )
+    except ClientError:
+        return False
+    
+    return True

@@ -1,15 +1,22 @@
-from typing import List, TypeVar, Self
+"""
+This module provides functionality for working with media files and FFmpeg filters.
+"""
+
+from typing import List, TypeVar, Self, Any
 import logging
+from tempfile import NamedTemporaryFile
 
 import ffmpeg
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 from py_ffmpeg.exceptions import UnsupportedMediaFileError
-
-from utils import MediaFile, SupportedMediaFileType
+from utils import MediaFile, SupportedMediaFileType, upload_file_to_s3
 from settings import AWSSettings
 
-
 FilterableStream = TypeVar("FilterableStream", "ffmpeg.nodes.FilterableStream", str)
+error_logger = logging.getLogger("error_logger")
+error_logger.setLevel(logging.ERROR)
+error_looger_handler = logging.FileHandler("error.log")
+error_logger.addHandler(error_looger_handler)
 
 
 class InputFile(BaseModel):
@@ -29,7 +36,6 @@ class InputFile(BaseModel):
         init=False,
         description="The ffmpeg stream object for the input media file.",
     )
-    aws_settings: AWSSettings = Field(init=False, default=None)
 
     @model_validator(mode="after")
     def get_media_stream(self) -> Self:
@@ -45,40 +51,52 @@ class InputFile(BaseModel):
         if not isinstance(self.media_file.file_type, SupportedMediaFileType):
             raise UnsupportedMediaFileError()
         self.stream = ffmpeg.input(self.media_file.url)
-        self.media_file = self.media_file.set_duration()
+        if self.media_file.file_type == SupportedMediaFileType.VIDEO:
+            self.media_file = self.media_file.set_duration()
         return self
 
 
 class PyFFmpeg(BaseModel):
     """
-    A class for generating a video file by concatenating multiple video files and audio file using FFmpeg.
+    A class for processing media files with FFmpeg.
 
-    Attributes:
-        video (List[InputFile]): A list of video input files.
-        audio_file (InputFile): The audio input file.
-        overwrite (bool): If True, will overwrite existing output file. (default: True)
+    The class takes in a list of video input files and a single audio input file,
+    and generates a single output file with the concatenated video and audio.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    video: List[InputFile]
+    video: List[InputFile] | List[FilterableStream]
     audio: InputFile
     output_location: MediaFile
     overwrite: bool = Field(default=True)
+    aws_client: Any
+    aws_settings: AWSSettings
     filter_stream: FilterableStream = Field(init=False, default=None)
 
     @field_validator("video", mode="after")
-    def reduce_video_quality(self) -> List[FilterableStream]:
+    def rescale_video(cls, videos: List[InputFile]) -> List[FilterableStream]:
+        """
+        Validates the "video" field after it has been set.
+
+        Args:
+            cls (Type[Model]): The model class.
+            videos (List[InputFile]): The list of input files.
+
+        Returns:
+            List[FilterableStream]: The list of filtered video streams.
+
+        Raises:
+            None
+        """
+        # print(videos)
         video_streams = []
-        for video in self.video:
+        for video in videos:
             video_stream = video.stream
             video_stream = ffmpeg.filter(video_stream, "scale", 406, 720)
             video_stream = ffmpeg.filter(video_stream, "setsar", 1, 1)
             video_streams.append(video_stream)
 
-        self.video.clear()
-        self.video.extend(video_streams)
-
-        return self.video
+        return video_streams
 
     def concatinate_video(self) -> Self:
         """
@@ -87,9 +105,7 @@ class PyFFmpeg(BaseModel):
         Returns:
             Self: The modified object with the concatenated video stream.
         """
-        self.filter_stream = ffmpeg.concat(
-            *[video.stream for video in self.video], v=1, a=0
-        )
+        self.filter_stream = ffmpeg.concat(*[stream for stream in self.video], v=1, a=0)
         return self
 
     def trim_video(self, end: int = None) -> Self:
@@ -104,10 +120,10 @@ class PyFFmpeg(BaseModel):
             Self: The modified object with the trimmed video.
         """
         if end is None:
-            end = self.audio_file.media_file.duration
+            end = self.audio.media_file.duration
 
         self.filter_stream = ffmpeg.trim(
-            self.filter_stream, end=self.audio_file.media_file.duration
+            self.filter_stream, end=self.audio.media_file.duration
         )
 
         return self
@@ -120,17 +136,36 @@ class PyFFmpeg(BaseModel):
             MediaFile: The generated media file object.
         """
 
-        process = ffmpeg.output(
+        stream = ffmpeg.output(
             self.filter_stream,
-            self.audio_file.stream,
-            self.output_location.url,
+            self.audio.stream,
+            "pipe:",
             shortest=None,
+            f='mpegts'
         )
-        try:
-            process.run(overwrite_output=self.overwrite)
+        process = ffmpeg.run(
+            stream,
+            overwrite_output=self.overwrite,
+            capture_stdout=True,
+            capture_stderr=True,
+        )
+        if process[1] != 0:
+            error_logger.exception("FFmpeg error: %s", process[1])
+            return None
 
-        except ffmpeg.Error() as e:
-            # add loggin here
-            return none
+        with NamedTemporaryFile() as temp_file: 
+            with open(temp_file.name, "wb") as f:
+                for chunk in process[0]:
+                    f.write(chunk)
+            upload = upload_file_to_s3(
+                aws_client=self.aws_client,
+                media_file=self.output_location,
+                file_location=temp_file.name,
+                aws_settings=self.aws_settings,
+            )
+
+            if not upload:
+                error_logger.error("Failed to uplad output file to S3")
+                return None
 
         return self.output_location
