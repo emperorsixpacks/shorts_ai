@@ -120,7 +120,7 @@ def get_videos_from_subreddit(number_of_videos: int = 4):
             scrubber_media_url = video_data.get("fallback_url")
 
             if (
-                10 <= duration <= 15
+                10 <= duration <= 12
                 and height >= 1000
                 and width >= 1000
                 and scrubber_media_url

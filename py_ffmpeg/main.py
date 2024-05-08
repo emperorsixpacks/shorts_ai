@@ -91,8 +91,8 @@ class PyFFmpeg(BaseModel):
         # print(videos)
         video_streams = []
         for video in videos:
-            video_stream = video.stream
-            video_stream = ffmpeg.filter(video_stream, "scale", 406, 720)
+            video_stream = video.stream 
+            video_stream = ffmpeg.filter(video_stream, "scale", 1080, 1920)
             video_stream = ffmpeg.filter(video_stream, "setsar", 1, 1)
             video_streams.append(video_stream)
 
@@ -149,14 +149,15 @@ class PyFFmpeg(BaseModel):
             capture_stdout=True,
             capture_stderr=True,
         )
-        if process[1] != 0:
-            error_logger.exception("FFmpeg error: %s", process[1])
-            return None
+        # print(process)
+        # if process[1] != 0:
+        #     error_logger.exception("FFmpeg error: %s", process[1])
+        #     return None
 
-        with NamedTemporaryFile() as temp_file: 
+        with NamedTemporaryFile() as temp_file:
             with open(temp_file.name, "wb") as f:
-                for chunk in process[0]:
-                    f.write(chunk)
+                # for chunk in process[0]:
+                f.write(process[0])
             upload = upload_file_to_s3(
                 aws_client=self.aws_client,
                 media_file=self.output_location,
@@ -165,6 +166,7 @@ class PyFFmpeg(BaseModel):
             )
 
             if not upload:
+                print("failed to upload file to s3")
                 error_logger.error("Failed to uplad output file to S3")
                 return None
 
