@@ -40,7 +40,6 @@ from utils import (
     MediaFile,
     Story,
     WikiPage,
-    AWSS3Method,
     SupportedMediaFileType,
     upload_file_to_s3,
 )

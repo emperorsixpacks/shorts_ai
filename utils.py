@@ -44,16 +44,17 @@ class MediaFile:
     timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()), init=False)
 
     def __post_init__(self):
-        self.name: str = self.name.replace(" ", "_").lower()
+        self.name: str = self._format_name()
         self.duration: int = None
 
-    def return_formated_name(self):
+    def _format_name(self) -> str:
         """
         Returns a formatted name for the media file based on the file type.
 
         Returns:
             str: The formatted name of the media file.
         """
+        self.name = self.name.replace(" ", "_").lower()
         match self.file_type:
             case SupportedMediaFileType.VIDEO:
                 return f"video_{self.name}-{self.timestamp}.{self.file_type}"
@@ -152,11 +153,14 @@ def upload_file_to_s3(
     None
     """
     try:
+        print("uplading file to s3")
         with open(file_location, "rb") as file:
             aws_client.upload_fileobj(
-                Fileobj=file, Bucket=aws_settings.s3_bucket, Key=media_file.name
+                Fileobj=file, Bucket=aws_settings.s3_bucket, Key=media_file.name, ExtraArgs={
+                    "ContentType":media_file.file_type
+                }
             )
     except ClientError:
         return False
-    
+    print("Done uploading file to s3")
     return True
