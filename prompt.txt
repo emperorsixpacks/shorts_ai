@@ -7,6 +7,8 @@ fun
 entertaining
 easy to understand grammer
 
+your output most be <= 120 words
+
 Stick closely to the documents provided to generate your output. Do not make up stories that are not in the provided document.
 Avoid excessive literary devices or imaginative explorations that stray from the core facts presented in the documents.
 The idea is for the output to be both educational, informative and fun.

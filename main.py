@@ -291,7 +291,7 @@ def generate_story(user_prompt: str, context_documents: List[Document]) -> Story
     llm = AI21(
         model="j2-mid",
         ai21_api_key=llm_settings.ai21_api_key,
-        maxTokens=100,
+        maxTokens=120,
         presencePenalty=presence_penalty,
         minTokens=80,
         frequencyPenalty=frequency_penalty,
@@ -438,14 +438,15 @@ def main():
     if not checked_prompt:
         print("mate, this never happened or I am to old to remember 🥲")
         return
-    story = generate_story(user_prompt=prompt, context_documents=documents)
-    audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
-    number_of_videos = int(audio.duration // 10)
-    videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
-    output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
-    combine_video_and_audio(
-        input_audio_file=audio, input_video_files=videos, output_file=output_file
-    )
+    # story = generate_story(user_prompt=prompt, context_documents=documents)
+    # print(story)
+    # audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    # number_of_videos = int(audio.duration // 10)
+    # videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
+    # output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
+    # combine_video_and_audio(
+    #     input_audio_file=audio, input_video_files=videos, output_file=output_file
+    # )
 
 
 if __name__ == "__main__":
