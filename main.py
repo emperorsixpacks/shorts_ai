@@ -455,11 +455,13 @@ def check_existing_redis_index(index_name: str) -> bool:
 
 
 def main():
-    prompt = "Write on why no one is allowed into Elvis Presly's room in graceland"
+    prompt = "Write on how nigeria got her name"
     entities = extract_entities(text=prompt)
     tokens = [wiki_search(entity) for entity in entities]
     tokens = list(itertools.chain(*tokens))
+    indexes = []
     for token in tokens:
+        print(token)
         logger.info("Checking existing redis index")
         if not check_existing_redis_index(token):
             logger.info("Creating new redis index: %s", token)
@@ -468,12 +470,13 @@ def main():
             logger.info("Chunking and saving text")
             chunk = chunk_and_save(page)
             if not chunk:
-                tokens.remove(token)
+                continue
+        indexes.append(token)
     logger.info("Done checking and creating redis indexes")
-
+    
     documents = return_documents(
         prompt,
-        index_names=tokens,
+        index_names=indexes,
     )
     checked_prompt = check_user_prompt(text=prompt, valid_documents=documents)
     if not checked_prompt:
@@ -491,8 +494,5 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()
-    # print(Redis(redis_url=redis_url, embedding=embeddings, index_name="test").schema)
-    
-    # text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=250)
-    # print(VectorstoreIndexCreator(vectorstore_cls=Redis, embedding=embeddings, text_splitter=text_splitter).)
+    main()
+
