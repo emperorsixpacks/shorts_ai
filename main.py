@@ -438,48 +438,17 @@ def main():
     if not checked_prompt:
         print("mate, this never happened or I am to old to remember 🥲")
         return
-    # story = generate_story(user_prompt=prompt, context_documents=documents)
-    # print(story)
-    # audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
-    # number_of_videos = int(audio.duration // 10)
-    # videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
-    # output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
-    # combine_video_and_audio(
-    #     input_audio_file=audio, input_video_files=videos, output_file=output_file
-    # )
+    story = generate_story(user_prompt=prompt, context_documents=documents)
+    print(story)
+    audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    number_of_videos = int(audio.duration // 10)
+    videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
+    output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
+    combine_video_and_audio(
+        input_audio_file=audio, input_video_files=videos, output_file=output_file
+    )
 
 
 if __name__ == "__main__":
     main()
-    # file = MediaFile(name='rc_car_in_a_dog_park', file_type=SupportedMediaFileType.VIDEO, size=None, url='https://v.redd.it/x2s3x8cxbqsc1/DASH_1080.mp4?source=fallback', author='nomar_ramon', timestamp=1714957608).set_duration()
-    # print(file.duration)
-
-
-# tokens = return_ner_tokens(prompt)
-# print(tokens)
-# search = [wiki_search(token) for token in tokens]
-# print(search)
-# contents = [get_page_content(title) for titles in search for title in titles]
-# # print([i for i in content])
-# chunk_and_save(contents)
-
-# #
-
-
-# # print(documents)
-
-# print(check_user_prompt(text=prompt, valid_documents=documents))
-# # print(documents)
-
-# print(convert_text_to_audio("he"))
-# story =
-# print(convert_text_to_audio(text="hello"))
-# print(generate_presigned_url("hello_world.wav"))
-
-
-# mefia_file =
-# (name="hello", file_type=SupportedMediaFileType.VIDEO)
-# print(mefia_file.return_formated_name())
-
-
-# TODO - setup a loop to chack the user prompt and check if it is valid
+    
