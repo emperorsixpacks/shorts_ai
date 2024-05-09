@@ -3,18 +3,15 @@ import random
 import logging
 from typing import List, Dict
 from tempfile import NamedTemporaryFile
-
 from functools import lru_cache
-from io import BytesIO
+import itertools
 
 import requests
 import wikipediaapi
 import praw
-from mutagen.mp3 import MP3
-
 import boto3
-
 from huggingface_hub import InferenceClient
+from redisvl.index import SearchIndex
 
 from langchain_community.llms.ai21 import AI21, AI21PenaltyData
 from langchain_community.chat_models.deepinfra import ChatDeepInfra
@@ -310,7 +307,7 @@ def generate_story(user_prompt: str, context_documents: List[Document]) -> Story
     return Story(prompt=user_prompt, text=question["text"])
 
 
-def return_ner_tokens(text: str):
+def extract_entities(text: str):
     """
     A function that returns named entity recognition (NER) tokens from the given text.
 
@@ -376,7 +373,7 @@ def get_page_content(title: str) -> WikiPage:
     return WikiPage(page_title=title, text=wiki_wiki.page(title=title).text)
 
 
-def chunk_and_save(pages: List[WikiPage]):
+def chunk_and_save(page: WikiPage):
     """
     Splits the text of each WikiPage in the given list into smaller chunks using the RecursiveCharacterTextSplitter.
 
@@ -387,17 +384,21 @@ def chunk_and_save(pages: List[WikiPage]):
         List[Redis]: A list of Redis objects created from the split text of each WikiPage.
     """
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=250)
-    page_splits = [
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=250)
+    page_splits = (
         WikiPage(page_title=page.page_title, text=text_splitter.split_text(page.text))
-        for page in pages
         if page.text != ""
-    ]
-    for page in page_splits:
-        Redis.from_texts(
-            page.text, embeddings, redis_url=redis_url, index_name=page.page_title
-        )
-    return
+        else None
+    )
+    if page_splits is None:
+        return False
+    Redis.from_texts(
+        page_splits.text,
+        embeddings,
+        redis_url=redis_url,
+        index_name=page_splits.page_title,
+    )
+    return True
 
 
 def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Document]:
@@ -422,17 +423,57 @@ def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Docume
     ]
 
 
-def main():
-    prompt = (
-        "Write on what happened to John F. Kennedy's brain after he was assasinated"
+def check_existing_redis_index(index_name: str) -> bool:
+    """
+    Checks if an index with the given name exists in Redis.
+
+    Args:
+        index_name (str): The name of the index to check.
+
+    Returns:
+        bool: True if the index exists, False otherwise.
+    """
+    index = SearchIndex.from_dict(
+        {
+            "index": {"name": index_name, "prefix": "docs", "storage_type": "hash"},
+            "fields": [
+                {
+                    "name": "content_vector",
+                    "type": "vector",
+                    "attrs": {
+                        "dims": 1536,
+                        "algorithm": "FLAT",
+                        "datatype": "FLOAT32",
+                        "distance_metric": "COSINE",
+                    },
+                }
+            ],
+        }
     )
+
+    return index.connect(redis_url=redis_url).exists()
+
+
+def main():
+    prompt = "Write on why no one is allowed into Elvis Presly's room in graceland"
+    entities = extract_entities(text=prompt)
+    tokens = [wiki_search(entity) for entity in entities]
+    tokens = list(itertools.chain(*tokens))
+    for token in tokens:
+        logger.info("Checking existing redis index")
+        if not check_existing_redis_index(token):
+            logger.info("Creating new redis index: %s", token)
+            logger.info("Getting page content")
+            page = get_page_content(token)
+            logger.info("Chunking and saving text")
+            chunk = chunk_and_save(page)
+            if not chunk:
+                tokens.remove(token)
+    logger.info("Done checking and creating redis indexes")
+
     documents = return_documents(
         prompt,
-        index_names=[
-            "john_f._kennedy",
-            "assassination_of_john_f._kennedy",
-            "jfk_(film)",
-        ],
+        index_names=tokens,
     )
     checked_prompt = check_user_prompt(text=prompt, valid_documents=documents)
     if not checked_prompt:
@@ -440,15 +481,18 @@ def main():
         return
     story = generate_story(user_prompt=prompt, context_documents=documents)
     print(story)
-    audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
-    number_of_videos = int(audio.duration // 10)
-    videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
-    output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
-    combine_video_and_audio(
-        input_audio_file=audio, input_video_files=videos, output_file=output_file
-    )
+    # audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    # number_of_videos = int(audio.duration // 10)
+    # videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
+    # output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
+    # combine_video_and_audio(
+    #     input_audio_file=audio, input_video_files=videos, output_file=output_file
+    # )
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    # print(Redis(redis_url=redis_url, embedding=embeddings, index_name="test").schema)
     
+    # text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=250)
+    # print(VectorstoreIndexCreator(vectorstore_cls=Redis, embedding=embeddings, text_splitter=text_splitter).)

@@ -15,7 +15,7 @@ from settings import AWSSettings
 FilterableStream = TypeVar("FilterableStream", "ffmpeg.nodes.FilterableStream", str)
 error_logger = logging.getLogger("error_logger")
 error_logger.setLevel(logging.ERROR)
-error_looger_handler = logging.FileHandler("error.log")
+error_looger_handler = logging.FileHandler("logs/error.log")
 error_logger.addHandler(error_looger_handler)
 
 
@@ -143,31 +143,31 @@ class PyFFmpeg(BaseModel):
             shortest=None,
             f='mpegts'
         )
-        process = ffmpeg.run(
-            stream,
-            overwrite_output=self.overwrite,
-            capture_stdout=True,
-            capture_stderr=True,
-        )
-        # print(process)
-        # if process[1] != 0:
-        #     error_logger.exception("FFmpeg error: %s", process[1])
-        #     return None
-
-        with NamedTemporaryFile() as temp_file:
-            with open(temp_file.name, "wb") as f:
-                # for chunk in process[0]:
-                f.write(process[0])
-            upload = upload_file_to_s3(
-                aws_client=self.aws_client,
-                media_file=self.output_location,
-                file_location=temp_file.name,
-                aws_settings=self.aws_settings,
+        
+        try:
+            process = ffmpeg.run(
+                stream,
+                overwrite_output=self.overwrite,
+                capture_stdout=True,
+                capture_stderr=True,
             )
+            with NamedTemporaryFile() as temp_file:
+                with open(temp_file.name, "wb") as f:
+                    f.write(process[0])
+                upload = upload_file_to_s3(
+                    aws_client=self.aws_client,
+                    media_file=self.output_location,
+                    file_location=temp_file.name,
+                    aws_settings=self.aws_settings,
+                )
 
-            if not upload:
-                print("failed to upload file to s3")
-                error_logger.error("Failed to uplad output file to S3")
-                return None
+                if not upload:
+                    print("failed to upload file to s3")
+                    error_logger.error("Failed to uplad output file to S3")
+                    return None
+            
+        except ffmpeg.Error as e:
+            error_logger.error("Error occurred while running FFmpeg: %s", e.stderr)
+            return None
 
         return self.output_location
