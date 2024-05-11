@@ -26,10 +26,10 @@ import numpy as np
 
 @dataclass
 class Transcript:
-    content: str = field(default=None)
+    text: str = field(default=None)
     start_time: float = field(default=None)  # in seconds
     end_time: float = field(default=None)  # in seconds
-    
+
     def __post_init__(self):
         self._start_time = self.start_time
         self._end_time = self.end_time
@@ -42,7 +42,7 @@ class Transcript:
         :return: The start time of the object as an integer.
         :rtype: int
         """
-        return self._start_time 
+        return self._start_time
 
     @start_time.setter
     def start_time(self, value: float):
@@ -80,13 +80,18 @@ class Transcript:
         """
         self._end_time = value * 1000
 
-    def __str__(self):
-        return self.content
-
-    
+    def to_dict(self):
+        """
+        A method that converts attributes of the object to a dictionary format.
+        """
+        return {
+            "text": self.text,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
+        }
 
     @classmethod
-    def open_transcript_json(cls, file_path: str) -> List[Transcript]:
+    def open_transcript_json(cls, file_path: str) -> List[Dict[str, str]]:
         """
         Opens the transcript file and returns a list of Transcript objects.
 
@@ -104,9 +109,9 @@ class Transcript:
                     cleaned_data = {
                         "start_time": float(item.get("start_time", 0)),
                         "end_time": float(item.get("end_time", 0)),
-                        "content": item["alternatives"][0]["content"],
+                        "text": item["alternatives"][0]["content"],
                     }
-                    transcripts.append(Transcript(**cleaned_data))
+                    transcripts.append(Transcript(**cleaned_data).to_dict())
                 div_sections = int(len(transcripts) / 5)
                 np_array = np.array_split(transcripts, div_sections)
                 return [array.tolist() for array in np_array]
@@ -184,8 +189,8 @@ class Style(Entry):
 
 class Dialogue(Entry):
     layer: str = Field(default="0", alias="Layer")
-    start_time: str = Field(default="00:00:00.00", alias="Start")
-    stop_time: str = Field(default="00:00:00.00", alias="End")
+    start_time: float | int | str = Field(default="00:00:00.00", alias="Start")
+    stop_time: float | int | str = Field(default="00:00:00.00", alias="End")
     style: str = Field(default=None, alias="Style")
     name: str = Field(default="Default", alias="Name")
     text: str = Field(default="This is my text", alias="Text")
@@ -211,6 +216,34 @@ class Dialogue(Entry):
         self["style"] = self["style"].name
         return self
 
+    @model_validator(mode="after")
+    def return_time_formarts(self) -> Self:
+        """
+        A model validator function that returns the start and stop time in the format "HH:MM:SS.FFF".
+
+        This function is decorated with `@model_validator(mode="after")` to indicate that it should be executed after other model validators.
+
+        Parameters:
+            self (object): The current object.
+
+        Returns:
+            object: The current object with the start and stop time in the format "HH:MM:SS.FFF".
+        """
+        
+        if not isinstance(self["start_time"], (int, float)) or not isinstance(self["stop_time"], (int, float)):
+            return self
+        
+        time_format = "%H:%M:%S.%f"
+        
+        start_time_delta = timedelta(seconds=self.start_time)
+        stop_time_delta = timedelta(seconds=self.stop_time)
+        
+        referemce_time = datetime()
+        
+        self.start_time = (referemce_time + start_time_delta).strftime(time_format)
+        self.stop_time = (referemce_time + stop_time_delta).strftime(time_format)
+        
+        return self
 
 class Section(BaseModel):
     title: str = Field(default=None)
@@ -229,7 +262,7 @@ class Section(BaseModel):
             lines.append(line)
 
         return "\n".join(lines) + "\n\n"
-        # return lines
+        
 
 
 class PyAss:
