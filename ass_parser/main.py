@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 import json
+from pprint import pprint
 from datetime import datetime, timedelta
 from typing import Dict, List, Self
 from dataclasses import dataclass, field
@@ -26,8 +27,12 @@ import numpy as np
 @dataclass
 class Transcript:
     content: str = field(default=None)
-    _start_time: float = field(default=None)  # in seconds
-    _end_time: float = field(default=None)  # in seconds
+    start_time: float = field(default=None)  # in seconds
+    end_time: float = field(default=None)  # in seconds
+    
+    def __post_init__(self):
+        self._start_time = self.start_time
+        self._end_time = self.end_time
 
     @property
     def start_time(self) -> int:
@@ -37,10 +42,10 @@ class Transcript:
         :return: The start time of the object as an integer.
         :rtype: int
         """
-        return int(self._start_time)
+        return self._start_time 
 
     @start_time.setter
-    def start_time(self, value: int):
+    def start_time(self, value: float):
         """
         Set the start time of the object.
 
@@ -60,10 +65,10 @@ class Transcript:
         :return: The end time of the object as an integer.
         :rtype: int
         """
-        return int(self._end_time)
+        return self._end_time
 
     @end_time.setter
-    def end_time(self, value: int):
+    def end_time(self, value: float):
         """
         Set the end time of the object.
 
@@ -78,12 +83,7 @@ class Transcript:
     def __str__(self):
         return self.content
 
-    def __dict__(self):
-        return {
-            "start_time": self.start_time,
-            "end_time": self.end_time,
-            "content": self.content,
-        }
+    
 
     @classmethod
     def open_transcript_json(cls, file_path: str) -> List[Transcript]:
@@ -102,12 +102,14 @@ class Transcript:
                 transcripts = []
                 for item in data["results"]["items"]:
                     cleaned_data = {
-                        "_start_time": float(item.get("start_time", 0)),
-                        "_end_time": float(item.get("end_time", 0)),
+                        "start_time": float(item.get("start_time", 0)),
+                        "end_time": float(item.get("end_time", 0)),
                         "content": item["alternatives"][0]["content"],
                     }
                     transcripts.append(Transcript(**cleaned_data))
-                return transcripts
+                div_sections = int(len(transcripts) / 5)
+                np_array = np.array_split(transcripts, div_sections)
+                return [array.tolist() for array in np_array]
         except FileNotFoundError as e:
             raise FileNotFoundError(f"File not found: {file_path}") from e
 
@@ -259,7 +261,7 @@ if __name__ == "__main__":
     transcripts = Transcript.open_transcript_json(
         file_path="/home/emperorsixpacks/Downloads/asrOutput(1).json"
     )
-    print(transcripts)
+    pprint(transcripts)
     # ordering_format = Format(
     #     fields=[
     #         "Name",
