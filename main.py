@@ -10,6 +10,8 @@ import requests
 import wikipediaapi
 import praw
 import boto3
+
+boto3.client().
 from huggingface_hub import InferenceClient
 from redisvl.index import SearchIndex
 
@@ -483,14 +485,13 @@ def main():
         print("mate, this never happened or I am to old to remember 🥲")
         return
     story = generate_story(user_prompt=prompt, context_documents=documents)
-    print(story)
-    # audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
-    # number_of_videos = int(audio.duration // 10)
-    # videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
-    # output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
-    # combine_video_and_audio(
-    #     input_audio_file=audio, input_video_files=videos, output_file=output_file
-    # )
+    audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    number_of_videos = int(audio.duration // 10)
+    videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
+    output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
+    combine_video_and_audio(
+        input_audio_file=audio, input_video_files=videos, output_file=output_file
+    )
 
 
 if __name__ == "__main__":

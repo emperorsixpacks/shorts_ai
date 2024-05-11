@@ -1,0 +1,7 @@
+[Script Info]
+Title: Sample project
+
+[Events]
+Format: Layer,Start,End,Style,Name,Text
+Dialogue: 0,00:00:00.00,00:00:00.00,Default,Default,This is my text
+

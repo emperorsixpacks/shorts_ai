@@ -72,7 +72,8 @@ class PyFFmpeg(BaseModel):
     aws_client: Any
     aws_settings: AWSSettings
     filter_stream: FilterableStream = Field(init=False, default=None)
-
+    
+    @classmethod
     @field_validator("video", mode="after")
     def rescale_video(cls, videos: List[InputFile]) -> List[FilterableStream]:
         """
