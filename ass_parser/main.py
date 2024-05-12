@@ -3,7 +3,7 @@ import os
 import json
 from pprint import pprint
 from datetime import datetime, timedelta
-from typing import Dict, List, Self
+from typing import Dict, List, Self, Tuple
 from dataclasses import dataclass, field
 from exceptions import UnsupportedFileFormat
 
@@ -21,6 +21,7 @@ class Transcript:
         start_time (float | int): The start time of the caption or subtitle in seconds.
         end_time (float | int): The end time of the caption or subtitle in seconds.
     """
+
     text: str = field(default=None)
     start_time: float | int = field(default=None)  # in seconds
     end_time: float | int = field(default=None)  # in seconds
@@ -54,7 +55,7 @@ class Transcript:
         Returns:
             None
         """
-        self._start_time = value * 1000
+        self._start_time = int(value * 1000)
 
     @property
     def end_time(self) -> int:
@@ -77,22 +78,8 @@ class Transcript:
         Returns:
             None
         """
-        self._end_time = value * 1000
-
-    def to_dict(self) -> Dict[str, str]:
-        """
-        A method that converts attributes of the object to a dictionary format.
-
-        :return: A dictionary containing the text, start_time, and end_time
-            attributes of the object.
-        :rtype: dict
-        """
-        return {
-            "text": self.text,
-            "start_time": str(self.start_time),
-            "end_time": str(self.end_time),
-        }
-
+        self._end_time = int(value * 1000)
+        
     @classmethod
     def open_transcript_json(cls, file_path: str) -> List[Dict[str, str]]:
         """
@@ -110,20 +97,19 @@ class Transcript:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                transcripts = []
+                _transcripts = []
                 for item in data["results"]["items"]:
                     cleaned_data = {
                         "start_time": float(item.get("start_time", 0)),
                         "end_time": float(item.get("end_time", 0)),
                         "text": item["alternatives"][0]["content"],
                     }
-                    transcripts.append(Transcript(**cleaned_data).to_dict())
-                div_sections = int(len(transcripts) / 5)
-                np_array = np.array_split(transcripts, div_sections)
+                    _transcripts.append(Transcript(**cleaned_data))
+                num_sections = int(len(_transcripts) / 5)
+                np_array = np.array_split(_transcripts, num_sections)
                 return [array.tolist() for array in np_array]
         except FileNotFoundError as e:
             raise FileNotFoundError(f"File not found: {file_path}") from e
-
 
 
 class Format(BaseModel):
@@ -150,7 +136,6 @@ class Format(BaseModel):
         return fields
 
 
-
 class Entry(BaseModel):
     """
     A class for storing the fields of a SubRip file entry.
@@ -164,7 +149,7 @@ class Entry(BaseModel):
     title: str = Field(default="Default", exclude=True, frozen=True, init=False)
     """The title of the entry."""
 
-    ordering_format: Format = Field(default=None, exclude=True)
+    ordering_format: Format | None = Field(default=None, exclude=True)
     """The format of the entry."""
 
     @model_validator(mode="after")
@@ -185,6 +170,8 @@ class Entry(BaseModel):
             ValueError: If the field at a specific index does not match the corresponding key in `self.ordering_format.fields`.
         """
         key_extras = self.model_dump(by_alias=True).keys()
+        if self.ordering_format is None:
+            raise ValueError("ordering_format cannot be None")
         for i, key in enumerate(key_extras):
             if self.ordering_format.fields[i] != key:
                 raise ValueError(
@@ -193,7 +180,7 @@ class Entry(BaseModel):
 
         return self
 
-    def return_entry_fields(self) -> str:
+    def return_entry_str(self) -> str:
         """
         Returns a string containing the values of all the fields in the current object, joined by commas.
 
@@ -258,10 +245,10 @@ class Dialogue(Entry):
     """The layer of the dialogue."""
 
     start_time: float | int | str = Field(default="00:00:00.00", alias="Start")
-    """The start time of the dialogue in the format "HH:MM:SS.FFF"."""
+    """The start time of the dialogue in milliseconds."""
 
-    stop_time: float | int | str = Field(default="00:00:00.00", alias="End")
-    """The end time of the dialogue in the format "HH:MM:SS.FFF"."""
+    end_time: float | int | str = Field(default="00:00:00.00", alias="End")
+    """The end time of the dialogue in milliseconds."""
 
     style: str = Field(default=None, alias="Style")
     """The name of the style to be applied to the dialogue."""
@@ -288,7 +275,9 @@ class Dialogue(Entry):
         Raises:
             ValueError: If the style attribute is not an instance of the Style class.
         """
-        if not isinstance(self["style"], Style):
+        if self["style"] is None:
+            raise ValueError("style cannot be None")
+        elif not isinstance(self["style"], Style):
             raise ValueError("style must be an instance of Style")
         self["style"] = self["style"].name
         return self
@@ -308,24 +297,30 @@ class Dialogue(Entry):
         """
 
         if not isinstance(self.start_time, (int, float)) or not isinstance(
-            self.stop_time, (int, float)
+            self.end_time, (int, float)
         ):
             return self
+        
 
         time_format = "%H:%M:%S.%f"
 
-        start_time_delta = timedelta(seconds=self.start_time)
-        stop_time_delta = timedelta(seconds=self.stop_time)
+        start_time_delta = timedelta(milliseconds=self.start_time)
+        stop_time_delta = timedelta(milliseconds=self.end_time)
 
         referemce_time = datetime(2024, 1, 1)
 
         self.start_time = (referemce_time + start_time_delta).strftime(time_format)
-        self.stop_time = (referemce_time + stop_time_delta).strftime(time_format)
+        self.end_time = (referemce_time + stop_time_delta).strftime(time_format)
 
         return self
 
     @classmethod
-    def from_list(cls, data: List[List[Dict[str, str]]], style: Style = None, ordering_format: Format = None) -> Self:
+    def from_list(
+        cls,
+        data: List[List[Transcript]],
+        style: Style = None,
+        ordering_format: Format = None,
+    ) -> Self:
         """
         Creates a list of Dialogue objects from a list of lists of dictionaries.
 
@@ -344,14 +339,14 @@ class Dialogue(Entry):
         for item in data:
             text = []
             for _, transcript in enumerate(item):
-                text.append(transcript["text"])
-                start_time = transcript["start_time"]
-                stop_time = transcript["end_time"]
+                text.append(transcript.text)
+                start_time = transcript.start_time
+                end_time = transcript.end_time
 
                 dialogues.append(
                     cls(
                         start_time=start_time,
-                        stop_time=stop_time,
+                        end_time=end_time,
                         text=" ".join(text),
                         style=style,
                         ordering_format=ordering_format,
@@ -370,7 +365,9 @@ class Section(BaseModel):
     """
 
     title: str = Field(default=None, description="The title of the section.")
-    fields: Dict[str, str] = Field(default=None, description="The fields in the section.")
+    fields: Tuple[List[str]] = Field(
+        default=None, description="The fields in the section."
+    )
 
     def to_ass_format(self) -> str:
         """
@@ -380,10 +377,8 @@ class Section(BaseModel):
             str: The object converted to the ASS format. Each key-value pair in the `fields` dictionary is converted to a line in the format "{key.capitalize()}: {value}". The lines are joined with a newline character and a trailing newline character is added.
         """
         lines = [f"[{self.title}]"]
-        for key, value in self.fields.items():
-            line = f"{key.capitalize()}: {value}"
-            lines.append(line)
-
+        for item in self.fields:
+            lines.append(f"{item[0].capitalize()}: {item[1]}")
         return "\n".join(lines) + "\n\n"
 
 
@@ -462,21 +457,27 @@ if __name__ == "__main__":
             "BackgroundColor",
         ]
     )
-    
+
     style = Style(ordering_format=ordering_format)
     dialogue_format = Format(fields=["Layer", "Start", "End", "Style", "Name", "Text"])
-    pprint(Dialogue.from_list(transcripts, style=style, ordering_format=dialogue_format))
-
+    # print(Dialogue(Text="Hello", style=style, Start=1111, End=222, ordering_format=dialogue_format))
+    dialogues = Dialogue.from_list(
+        transcripts, style=style, ordering_format=dialogue_format
+    )
+    print(dialogues[0].return_entry_str())
     # dialogue = Dialogue(ordering_format=dialogue_format, style=style)
 
-    # sript_info = Section(title="Script Info", fields={"title": "Sample project"})
+    # sript_info = Section(title="Script Info", fields=(["title", "Sample project"]))
     # events = Section(
     #     title="Events",
-    #     fields={
-    #         "Format": dialogue_format.return_fields_str(),
-    #         "Dialogue": dialogue.return_entry_fields(),
-    #     },
+    #     fields=(
+    #         ["Format", dialogue_format.return_fields_str()],
+    #         # dialogues
+    #     ),
     # )
 
+    # print(events.to_ass_format())
     # with PyAss("test.ass", "w", sections=[sript_info, events]) as ass:
     #     ass.write()
+    
+ 
