@@ -3,10 +3,11 @@ import os
 import json
 from pprint import pprint
 from datetime import datetime, timedelta
-from typing import Dict, List, Self, Tuple
+from typing import Dict, List, Self
 from dataclasses import dataclass, field
 from exceptions import UnsupportedFileFormat
 
+import num2words
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 import numpy as np
 
@@ -79,7 +80,7 @@ class Transcript:
             None
         """
         self._end_time = int(value * 1000)
-        
+
     @classmethod
     def open_transcript_json(cls, file_path: str) -> List[Dict[str, str]]:
         """
@@ -99,10 +100,15 @@ class Transcript:
                 data = json.load(f)
                 _transcripts = []
                 for item in data["results"]["items"]:
+                    text: str = item["alternatives"][0]["content"]
+                    if text.isnumeric():
+                        text = num2words.num2words(text)
+                    elif not text.isalpha():
+                        continue
                     cleaned_data = {
+                        "text": text,
                         "start_time": float(item.get("start_time", 0)),
                         "end_time": float(item.get("end_time", 0)),
-                        "text": item["alternatives"][0]["content"],
                     }
                     _transcripts.append(Transcript(**cleaned_data))
                 num_sections = int(len(_transcripts) / 5)
@@ -300,7 +306,6 @@ class Dialogue(Entry):
             self.end_time, (int, float)
         ):
             return self
-        
 
         time_format = "%H:%M:%S.%f"
 
@@ -344,13 +349,16 @@ class Dialogue(Entry):
                 end_time = transcript.end_time
 
                 dialogues.append(
-                    cls(
-                        start_time=start_time,
-                        end_time=end_time,
-                        text=" ".join(text),
-                        style=style,
-                        ordering_format=ordering_format,
-                    )
+                    [
+                        "Dialogue",
+                        cls(
+                            start_time=start_time,
+                            end_time=end_time,
+                            text=" ".join(text),
+                            style=style,
+                            ordering_format=ordering_format,
+                        ).return_entry_str(),
+                    ]
                 )
         return dialogues
 
@@ -365,7 +373,7 @@ class Section(BaseModel):
     """
 
     title: str = Field(default=None, description="The title of the section.")
-    fields: Tuple[List[str]] = Field(
+    fields: List[List[str]] = Field(
         default=None, description="The fields in the section."
     )
 
@@ -464,20 +472,16 @@ if __name__ == "__main__":
     dialogues = Dialogue.from_list(
         transcripts, style=style, ordering_format=dialogue_format
     )
-    print(dialogues[0].return_entry_str())
     # dialogue = Dialogue(ordering_format=dialogue_format, style=style)
 
     # sript_info = Section(title="Script Info", fields=(["title", "Sample project"]))
-    # events = Section(
-    #     title="Events",
-    #     fields=(
-    #         ["Format", dialogue_format.return_fields_str()],
-    #         # dialogues
-    #     ),
-    # )
+    event_fields = [["Format", dialogue_format.return_fields_str()]]
 
-    # print(events.to_ass_format())
-    # with PyAss("test.ass", "w", sections=[sript_info, events]) as ass:
-    #     ass.write()
-    
- 
+    for dialogue in dialogues:
+        event_fields.append(dialogue)
+    events = Section(
+        title="Events",
+        fields=event_fields,
+    )
+    with PyAss("test.ass", "w", sections=[events]) as ass:
+        ass.write()
