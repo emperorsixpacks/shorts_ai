@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Self
 from dataclasses import dataclass, field
+import string
 from exceptions import UnsupportedFileFormat
 
 import num2words
@@ -102,10 +103,10 @@ class Transcript:
                     text: str = item["alternatives"][0]["content"]
                     if text.isnumeric():
                         text = num2words.num2words(text)
-                    elif not text.isalpha():
+                    elif text in string.punctuation:
                         continue
                     cleaned_data = {
-                        "text": text,
+                        "text": text.lower(),
                         "start_time": float(item.get("start_time", 0)),
                         "end_time": float(item.get("end_time", 0)),
                     }
@@ -345,7 +346,7 @@ class Dialogue(Entry):
         for item in data:
             text = []
             for transcript in item:
-                text.append(transcript.text)
+                
                 start_time = transcript.start_time
                 end_time = transcript.end_time
 
@@ -355,12 +356,13 @@ class Dialogue(Entry):
                         cls(
                             start_time=start_time,
                             end_time=end_time,
-                            text=" ".join(text),
+                            text=f'{" ".join(text)} {transcript.text.upper()}',
                             style=style,
                             ordering_format=ordering_format,
                         ).return_entry_str(),
                     ]
                 )
+                text.append(transcript.text)
         return dialogues
 
 
@@ -487,3 +489,6 @@ if __name__ == "__main__":
     )
     with PyAss("test.ass", "w", sections=[events]) as ass:
         ass.write()
+
+
+
