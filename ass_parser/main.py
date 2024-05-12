@@ -313,8 +313,8 @@ class Dialogue(Entry):
 
         referemce_time = datetime(2024, 1, 1)
 
-        self.start_time = (referemce_time + start_time_delta).strftime(time_format)
-        self.end_time = (referemce_time + stop_time_delta).strftime(time_format)
+        self.start_time = (referemce_time + start_time_delta).strftime(time_format).strip()[:-4]
+        self.end_time = (referemce_time + stop_time_delta).strftime(time_format).strip()[:-4]
 
         return self
 
