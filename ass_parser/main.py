@@ -1,7 +1,6 @@
 from __future__ import annotations
 import os
 import json
-from pprint import pprint
 from datetime import datetime, timedelta
 from typing import Dict, List, Self
 from dataclasses import dataclass, field
@@ -325,7 +324,7 @@ class Dialogue(Entry):
         data: List[List[Transcript]],
         style: Style = None,
         ordering_format: Format = None,
-    ) -> Self:
+    ) -> List[Self]:
         """
         Creates a list of Dialogue objects from a list of lists of dictionaries.
 
@@ -333,9 +332,11 @@ class Dialogue(Entry):
         The function joins the text of all the transcripts in a dialogue together separated by a space.
 
         Args:
-            data (List[List[Dict[str, str]]]): The data to create the Dialogue objects from.
-            style (Style, optional): The style to be applied to all the Dialogue objects. Defaults to None.
-            ordering_format (Format, optional): The format of the ordering of the dialogues. Defaults to None.
+            data (List[List[Transcript]]): The data to create the Dialogue objects from.
+            style (Style, optional): The style to be applied to all the Dialogue objects.
+                Defaults to None.
+            ordering_format (Format, optional): The format of the ordering of the dialogues.
+                Defaults to None.
 
         Returns:
             List[Dialogue]: A list of Dialogue objects.
@@ -343,7 +344,7 @@ class Dialogue(Entry):
         dialogues = []
         for item in data:
             text = []
-            for _, transcript in enumerate(item):
+            for transcript in item:
                 text.append(transcript.text)
                 start_time = transcript.start_time
                 end_time = transcript.end_time
@@ -465,6 +466,7 @@ if __name__ == "__main__":
             "BackgroundColor",
         ]
     )
+    # print(transcripts)
 
     style = Style(ordering_format=ordering_format)
     dialogue_format = Format(fields=["Layer", "Start", "End", "Style", "Name", "Text"])
