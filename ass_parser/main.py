@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 import os
 import json
@@ -106,7 +107,7 @@ class Transcript:
                     elif text in string.punctuation:
                         continue
                     cleaned_data = {
-                        "text": text.lower(),
+                        "text": text.lower().strip(),
                         "start_time": float(item.get("start_time", 0)),
                         "end_time": float(item.get("end_time", 0)),
                     }
@@ -325,6 +326,7 @@ class Dialogue(Entry):
         data: List[List[Transcript]],
         style: Style = None,
         ordering_format: Format = None,
+        focus_style: str = None
     ) -> List[Self]:
         """
         Creates a list of Dialogue objects from a list of lists of dictionaries.
@@ -349,14 +351,15 @@ class Dialogue(Entry):
                 
                 start_time = transcript.start_time
                 end_time = transcript.end_time
-
+                
+                focus_text = f"{focus_style} {transcript.text.upper()} {focus_style}" if focus_style is not None else transcript.text.upper()
                 dialogues.append(
                     [
                         "Dialogue",
                         cls(
                             start_time=start_time,
                             end_time=end_time,
-                            text=f'{" ".join(text)} {transcript.text.upper()}',
+                            text=f'{" ".join(text)} {focus_text}',
                             style=style,
                             ordering_format=ordering_format,
                         ).return_entry_str(),
@@ -473,9 +476,7 @@ if __name__ == "__main__":
     style = Style(ordering_format=ordering_format)
     dialogue_format = Format(fields=["Layer", "Start", "End", "Style", "Name", "Text"])
     # print(Dialogue(Text="Hello", style=style, Start=1111, End=222, ordering_format=dialogue_format))
-    dialogues = Dialogue.from_list(
-        transcripts, style=style, ordering_format=dialogue_format
-    )
+    dialogues = Dialogue.from_list(transcripts, style=style, ordering_format=dialogue_format, focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}")
     # dialogue = Dialogue(ordering_format=dialogue_format, style=style)
 
     # sript_info = Section(title="Script Info", fields=(["title", "Sample project"]))
