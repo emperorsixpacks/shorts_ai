@@ -10,8 +10,8 @@ import requests
 import wikipediaapi
 import praw
 import boto3
+from botocore.exceptions import ClientError
 
-boto3.client().
 from huggingface_hub import InferenceClient
 from redisvl.index import SearchIndex
 
@@ -69,12 +69,18 @@ redis_url = f"redis://{redis_settings.redis_host}:{redis_settings.redis_port}"
 wiki_wiki = wikipediaapi.Wikipedia("MyProjectName (merlin@example.com)", "en")
 ner_model = InferenceClient(token=hf_hub_settings.HuggingFacehub_api_token)
 
-aws_client = boto3.client(
+aws_s3_client = boto3.client(
     "s3",
     aws_access_key_id=aws_settings.aws_access_key,
     aws_secret_access_key=aws_settings.aws_secret_key,
 )
 
+aws_polly_client = boto3.client(
+    "polly",
+    aws_access_key_id=aws_settings.aws_access_key,
+    aws_secret_access_key=aws_settings.aws_secret_key,
+    region_name="us-west-2",
+)
 
 @lru_cache
 def load_embeddings_model():
@@ -167,7 +173,7 @@ def combine_video_and_audio(
         video=input_videos,
         audio=input_audio,
         output_location=output_file,
-        aws_client=aws_client,
+        aws_s3_client=aws_s3_client,
         aws_settings=aws_settings,
     )
 
@@ -178,45 +184,50 @@ def combine_video_and_audio(
 
 def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
     """
-    Converts text to audio using the TTSMP3 API.
-
+    Converts text to audio using the provided client and text, then uploads the audio file to S3.
+    
     Parameters:
-        client (Client): The AWS client.
-        name (str): The name of the audio file.
-        text (Story): The text to be converted to audio.
-
+        client: The client used for text-to-speech conversion.
+        name: The name of the audio file.
+        text: The text content to convert to audio.
+    
     Returns:
-        MediaFile | None: The converted audio file if successful, None otherwise.
+        MediaFile or None: The generated MediaFile object with audio details, or None if the upload fails.
     """
+   
 
     logger.info("Converting text to audio")
     media_file = MediaFile(name=name, file_type=SupportedMediaFileType.AUDIO)
-    data = {"msg": text.text, "lang": "Matthew", "source": "ttsmp3"}
-    audio_url = requests.post(
-        "https://ttsmp3.com/makemp3_new.php", data=data, timeout=60
-    ).json()["URL"]
-    media_file.url = audio_url
-    with NamedTemporaryFile() as tempfile:
-        r = requests.get(audio_url, stream=True, timeout=60)
-        if r.status_code == 200:
+    try:
+        kwargs = {
+            "Engine": "standard",
+            "OutputFormat": "mp3",
+            "Text": text.text,
+            "VoiceId":"Matthew",
+            "LanguageCode":None
+        }
+        
+        response = client.synthesize_speech(**kwargs)
+        audio_stream = response["AudioStream"]
+        with NamedTemporaryFile() as tempfile:
             with open(tempfile.name, "wb") as f:
-                for chunk in r.iter_content(chunk_size=1024):
+                for chunk in audio_stream.iter_content(chunk_size=1024):
                     f.write(chunk)
-        else:
-            logger.warning("Failed to download audio from TTSMP3")
-            return None
-        logger.info("Uploading audio to S3")
-        upload = upload_file_to_s3(
-            client,
-            media_file=media_file,
-            file_location=tempfile.name,
-            aws_settings=aws_settings,
-        )
-        if not upload:
-            logger.warning("Failed to upload audio to S3")
-            return None
-    logger.info("Audio converted successfully")
-    return media_file.set_duration()
+            logger.info("Uploading audio to S3")
+            upload = upload_file_to_s3(
+                client,
+                media_file=media_file,
+                file_location=tempfile.name,
+                aws_settings=aws_settings,
+            )
+            if not upload:
+                logger.warning("Failed to upload audio to S3")
+                return None
+            logger.info("Audio converted successfully")
+    except ClientError as e:
+        logger.exception("Yo! something broke when I tried to generate the audio, %s", e)
+    else:
+        return media_file.set_duration()
 
 
 def open_prompt_txt(prompt_txt: str) -> str:
@@ -485,7 +496,7 @@ def main():
         print("mate, this never happened or I am to old to remember 🥲")
         return
     story = generate_story(user_prompt=prompt, context_documents=documents)
-    audio = convert_text_to_audio(client=aws_client, text=story, name=prompt)
+    audio = convert_text_to_audio(client=aws_s3_client, text=story, name=prompt)
     number_of_videos = int(audio.duration // 10)
     videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
     output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
