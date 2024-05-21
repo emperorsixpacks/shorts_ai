@@ -1,16 +1,18 @@
 from __future__ import annotations
 import os
+import re
 import json
+import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Self
 from dataclasses import dataclass, field
 import string
-from exceptions import UnsupportedFileFormat
 
 import num2words
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 import numpy as np
 
+from ass_parser.exceptions import UnsupportedFileFormat
 
 @dataclass
 class Transcript:
@@ -98,25 +100,27 @@ class Transcript:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                _transcripts = []
-                for item in data["results"]["items"]:
-                    text: str = item["alternatives"][0]["content"]
-                    if text.isnumeric():
-                        text = num2words.num2words(text)
-                    elif text in string.punctuation:
-                        continue
-                    cleaned_data = {
-                        "text": text.lower().strip(),
-                        "start_time": float(item.get("start_time", 0)),
-                        "end_time": float(item.get("end_time", 0)),
-                    }
-                    _transcripts.append(Transcript(**cleaned_data))
-                num_sections = int(len(_transcripts) / 5)
-                np_array = np.array_split(_transcripts, num_sections)
-                return [array.tolist() for array in np_array]
         except FileNotFoundError as e:
-            raise FileNotFoundError(f"File not found: {file_path}") from e
-
+            regex_patttern = r"^((http|https):\/\/)?([^\s]+\.[^\s]+)?(\/[^\s]*)?$"
+            if re.match(pattern=regex_patttern, string=file_path).groups[0] is None:
+                raise FileNotFoundError(f"File not found: {file_path}") from e
+            data  = requests.get(file_path, timeout=60).content
+        _transcripts = []
+        for item in data["results"]["items"]:
+            text: str = item["alternatives"][0]["content"]
+            if text.isnumeric():
+                text = num2words.num2words(text)
+            elif text in string.punctuation:
+                continue
+            cleaned_data = {
+                "text": text.lower().strip(),
+                "start_time": float(item.get("start_time", 0)),
+                "end_time": float(item.get("end_time", 0)),
+            }
+            _transcripts.append(Transcript(**cleaned_data))
+        num_sections = int(len(_transcripts) / 5)
+        np_array = np.array_split(_transcripts, num_sections)
+        return [array.tolist() for array in np_array]
 
 class Format(BaseModel):
     """
@@ -155,7 +159,7 @@ class Entry(BaseModel):
     title: str = Field(default="Default", exclude=True, frozen=True, init=False)
     """The title of the entry."""
 
-    order_format: Format
+    order_format: Format = Field(exclude=True)
     """The format of the entry."""
 
     @model_validator(mode="after")
@@ -189,7 +193,7 @@ class Entry(BaseModel):
     def _reorder_and_return_fields(self) -> Dict:
         fields = self.model_dump(by_alias=True)
 
-        return {key: fields.get(key, None) for key in self.order_format.fields}
+        return {key: str(fields.get(key, None)) for key in self.order_format.fields}
 
     def return_entry_str(self) -> str:
         """
@@ -198,7 +202,6 @@ class Entry(BaseModel):
         :return: A string containing the values of all the fields in the current object, joined by commas.
         :rtype: str
         """
-
         return ",".join(self._reorder_and_return_fields().values())
 
 
