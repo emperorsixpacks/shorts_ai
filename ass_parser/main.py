@@ -189,7 +189,7 @@ class Entry(BaseModel):
     def _reorder_and_return_fields(self) -> Dict:
         fields = self.model_dump(by_alias=True)
 
-        return {key: fields[key] for key in self.order_format.fields}
+        return {key: fields.get(key, None) for key in self.order_format.fields}
 
     def return_entry_str(self) -> str:
         """
@@ -199,7 +199,7 @@ class Entry(BaseModel):
         :rtype: str
         """
 
-        return ",".join(self.model_dump().values())
+        return ",".join(self._reorder_and_return_fields().values())
 
 
 class Style(Entry):
@@ -329,9 +329,10 @@ class Dialogue(Entry):
     def from_list(
         cls,
         data: List[List[Transcript]],
-        style: Style = None,
+        dialogue_style: Style = None,
         order_format: Format = None,
         focus_style: str = None,
+        **kwargs
     ) -> List[Self]:
         """
         Creates a list of Dialogue objects from a list of lists of dictionaries.
@@ -341,7 +342,7 @@ class Dialogue(Entry):
 
         Args:
             data (List[List[Transcript]]): The data to create the Dialogue objects from.
-            style (Style, optional): The style to be applied to all the Dialogue objects.
+            dialogue_style (Style, optional): The style to be applied to all the Dialogue objects.
                 Defaults to None.
             format (Format, optional): The format of the ordering of the dialogues.
                 Defaults to None.
@@ -349,7 +350,7 @@ class Dialogue(Entry):
         Returns:
             List[Dialogue]: A list of Dialogue objects.
         """
-        dialogues = []
+        _dialogues = []
         for item in data:
             text = []
             for transcript in item:
@@ -362,20 +363,21 @@ class Dialogue(Entry):
                     if focus_style is not None
                     else transcript.text.upper()
                 )
-                dialogues.append(
+                _dialogues.append(
                     [
                         "Dialogue",
                         cls(
                             start_time=start_time,
                             end_time=end_time,
                             text=f'{" ".join(text)} {focus_text}',
-                            style=style,
+                            style=dialogue_style,
                             ordering_format=order_format,
+                            **kwargs
                         ).return_entry_str(),
                     ]
                 )
                 text.append(transcript.text)
-        return dialogues
+        return _dialogues
 
 
 class Section(BaseModel):
@@ -483,24 +485,24 @@ if __name__ == "__main__":
     # print(transcripts)
 
     style = Style(order_format=ordering_format)
-    dialogue_format = Format(fields=["Layer", "Start", "End", "Style", "Text"])
-    # print(Dialogue(Text="Hello", style=style, Start=1111, End=222, ordering_format=dialogue_format))
-    dialogues = Dialogue.from_list(
-        transcripts,
-        style=style,
-        order_format=dialogue_format,
-        focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}",
-    )
+    print(style.return_entry_str())
+    # dialogue_format = Format(fields=["Layer", "Start", "End", "Style", "MarginL", "MarginR", "MarginV", "Text"])
+    # # print(Dialogue(Text="Hello", style=style, Start=1111, End=222, ordering_format=dialogue_format))
+    # dialogues = Dialogue.from_list(
+    #     transcripts,
+    #     style=style,
+    #     order_format=dialogue_format,
+    #     focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}",
+    # )
     # dialogue = Dialogue(ordering_format=dialogue_format, style=style)
 
     # sript_info = Section(title="Script Info", fields=(["title", "Sample project"]))
-    event_fields = [["Format", dialogue_format.return_fields_str()]]
-
-    for dialogue in dialogues:
-        event_fields.append(dialogue)
-    events = Section(
-        title="Events",
-        fields=event_fields,
-    )
-    with PyAss("test.ass", "w", sections=[events]) as ass:
-        ass.write()
+    # event_fields = [["Format", dialogue_format.return_fields_str()]]
+    # for dialogue in dialogues:
+    #     event_fields.append(dialogue)
+    # events = Section(
+    #     title="Events",
+    #     fields=event_fields,
+    # )
+    # with PyAss("test.ass", "w", sections=[events]) as ass:
+    #     ass.write()
