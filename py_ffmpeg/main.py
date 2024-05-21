@@ -7,7 +7,7 @@ import logging
 from tempfile import NamedTemporaryFile
 
 import ffmpeg
-from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator, HttpUrl, FilePath
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator, FilePath
 from py_ffmpeg.exceptions import UnsupportedMediaFileError
 from utils import MediaFile, SupportedMediaFileType, upload_file_to_s3
 from settings import AWSSettings
@@ -71,7 +71,7 @@ class PyFFmpeg(BaseModel):
     overwrite: bool = Field(default=True)
     aws_client: Any
     aws_settings: AWSSettings
-    subtitle: HttpUrl | FilePath = Field(default=None, description="This should be Advanced Substation Subtiles (.ass)")
+    subtitle: FilePath = Field(default=None, description="This should be Advanced Substation Subtiles (.ass)")
     filter_stream: FilterableStream = Field(init=False, default=None)
     
     @classmethod

@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 import os
 import json
@@ -156,7 +155,7 @@ class Entry(BaseModel):
     title: str = Field(default="Default", exclude=True, frozen=True, init=False)
     """The title of the entry."""
 
-    ordering_format: Format | None = Field(default=None, exclude=True)
+    order_format: Format
     """The format of the entry."""
 
     @model_validator(mode="after")
@@ -176,16 +175,21 @@ class Entry(BaseModel):
         Raises:
             ValueError: If the field at a specific index does not match the corresponding key in `self.ordering_format.fields`.
         """
-        key_extras = self.model_dump(by_alias=True).keys()
-        if self.ordering_format is None:
-            raise ValueError("ordering_format cannot be None")
-        for i, key in enumerate(key_extras):
-            if self.ordering_format.fields[i] != key:
+        fields = self.model_dump(by_alias=True).keys()
+        if self.order_format is None:
+            raise ValueError("order_format cannot be None")
+        for _, key in enumerate(fields):
+            if key not in self.order_format.fields:
                 raise ValueError(
-                    f"{key} doesn't match index in {self.ordering_format.fields}"
+                    f"{key} doesn't exist in {self.order_format.fields}"
                 )
 
         return self
+
+    def _reorder_and_return_fields(self) -> Dict:
+        fields = self.model_dump(by_alias=True)
+
+        return {key: fields[key] for key in self.order_format.fields}
 
     def return_entry_str(self) -> str:
         """
@@ -260,9 +264,6 @@ class Dialogue(Entry):
     style: str = Field(default=None, alias="Style")
     """The name of the style to be applied to the dialogue."""
 
-    name: str = Field(default="Default", alias="Name")
-    """The name of the speaker."""
-
     text: str = Field(default="This is my text", alias="Text")
     """The text of the dialogue."""
 
@@ -315,8 +316,12 @@ class Dialogue(Entry):
 
         referemce_time = datetime(2024, 1, 1)
 
-        self.start_time = (referemce_time + start_time_delta).strftime(time_format).strip()[:-4]
-        self.end_time = (referemce_time + stop_time_delta).strftime(time_format).strip()[:-4]
+        self.start_time = (
+            (referemce_time + start_time_delta).strftime(time_format).strip()[:-4]
+        )
+        self.end_time = (
+            (referemce_time + stop_time_delta).strftime(time_format).strip()[:-4]
+        )
 
         return self
 
@@ -325,8 +330,8 @@ class Dialogue(Entry):
         cls,
         data: List[List[Transcript]],
         style: Style = None,
-        ordering_format: Format = None,
-        focus_style: str = None
+        order_format: Format = None,
+        focus_style: str = None,
     ) -> List[Self]:
         """
         Creates a list of Dialogue objects from a list of lists of dictionaries.
@@ -338,7 +343,7 @@ class Dialogue(Entry):
             data (List[List[Transcript]]): The data to create the Dialogue objects from.
             style (Style, optional): The style to be applied to all the Dialogue objects.
                 Defaults to None.
-            ordering_format (Format, optional): The format of the ordering of the dialogues.
+            format (Format, optional): The format of the ordering of the dialogues.
                 Defaults to None.
 
         Returns:
@@ -348,11 +353,15 @@ class Dialogue(Entry):
         for item in data:
             text = []
             for transcript in item:
-                
+
                 start_time = transcript.start_time
                 end_time = transcript.end_time
-                
-                focus_text = f"{focus_style} {transcript.text.upper()} {focus_style}" if focus_style is not None else transcript.text.upper()
+
+                focus_text = (
+                    f"{focus_style} {transcript.text.upper()} {focus_style}"
+                    if focus_style is not None
+                    else transcript.text.upper()
+                )
                 dialogues.append(
                     [
                         "Dialogue",
@@ -361,7 +370,7 @@ class Dialogue(Entry):
                             end_time=end_time,
                             text=f'{" ".join(text)} {focus_text}',
                             style=style,
-                            ordering_format=ordering_format,
+                            ordering_format=order_format,
                         ).return_entry_str(),
                     ]
                 )
@@ -473,10 +482,15 @@ if __name__ == "__main__":
     )
     # print(transcripts)
 
-    style = Style(ordering_format=ordering_format)
-    dialogue_format = Format(fields=["Layer", "Start", "End", "Style", "Name", "Text"])
+    style = Style(order_format=ordering_format)
+    dialogue_format = Format(fields=["Layer", "Start", "End", "Style", "Text"])
     # print(Dialogue(Text="Hello", style=style, Start=1111, End=222, ordering_format=dialogue_format))
-    dialogues = Dialogue.from_list(transcripts, style=style, ordering_format=dialogue_format, focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}")
+    dialogues = Dialogue.from_list(
+        transcripts,
+        style=style,
+        order_format=dialogue_format,
+        focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}",
+    )
     # dialogue = Dialogue(ordering_format=dialogue_format, style=style)
 
     # sript_info = Section(title="Script Info", fields=(["title", "Sample project"]))
@@ -490,6 +504,3 @@ if __name__ == "__main__":
     )
     with PyAss("test.ass", "w", sections=[events]) as ass:
         ass.write()
-
-
-

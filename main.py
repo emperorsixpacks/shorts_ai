@@ -4,6 +4,7 @@ import logging
 import time
 from typing import List, Dict
 from tempfile import NamedTemporaryFile
+import itertools
 from functools import lru_cache
 
 import requests
@@ -42,7 +43,9 @@ from utils import (
     SupportedMediaFileType,
     upload_file_to_s3,
 )
+
 from py_ffmpeg.main import PyFFmpeg, InputFile
+from ass_parser import Transcript, Style, Dialogue, Section, PyAss, Format
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -533,12 +536,46 @@ def main():
     videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
     video_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
     trascript = transcribe_audio(aws_transcribe_client, audio=audio_file)
-    combine_video_and_audio(
-        input_audio_file=audio_file,
-        input_video_files=videos,
-        output_file=video_file,
-        transcript=trascript,
+    
+    transcripts = Transcript.open_transcript_json(
+        file_path=trascript
     )
+    ordering_format = Format(
+        fields=[
+            "Name",
+            "Fontname",
+            "Fontsize",
+            "PrimaryColour",
+            "SecondaryColour",
+            "OutlineColour",
+            "BackgroundColor",
+        ]
+    )
+    
+    
+    style = Style(ordering_format=ordering_format)
+    dialogue_format = Format(fields=["Layer", "Start", "End", "Style", "MarginL", "MarginR", "MarginV", "Text"])
+    
+    dialogues = Dialogue.from_list(transcripts, style=style, ordering_format=dialogue_format, focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}")
+    
+    event_fields = [["Format", dialogue_format.return_fields_str()]]
+
+    for dialogue in dialogues:
+        event_fields.append(dialogue)
+    events = Section(
+        title="Events",
+        fields=event_fields,
+    )
+    with NamedTemporaryFile(suffix=".ass") as subtitle:
+        with PyAss(subtitle.name, "w", sections=[events]) as ass:
+            ass.write()
+            
+        combine_video_and_audio(
+            input_audio_file=audio_file,
+            input_video_files=videos,
+            output_file=video_file,
+            transcript=subtitle.name,
+        )
 
 
 if __name__ == "__main__":
