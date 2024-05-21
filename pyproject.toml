@@ -28,6 +28,7 @@ boto3 = "^1.34.90"
 tts = "^0.22.0"
 ffmpeg-python = "^0.2.0"
 redisvl = "^0.2.0"
+edgedb = "^1.9.0"
 
 
 

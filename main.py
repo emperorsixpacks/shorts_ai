@@ -1,6 +1,7 @@
 import re
 import random
 import logging
+import time
 from typing import List, Dict
 from tempfile import NamedTemporaryFile
 from functools import lru_cache
@@ -81,6 +82,13 @@ aws_polly_client = boto3.client(
     aws_secret_access_key=aws_settings.aws_secret_key,
     region_name="us-west-2",
 )
+aws_transcribe_client = boto3.client(
+    "transcribe",
+    aws_access_key_id=aws_settings.aws_access_key,
+    aws_secret_access_key=aws_settings.aws_secret_key,
+    region_name="us-east-1",
+)
+
 
 @lru_cache
 def load_embeddings_model():
@@ -125,7 +133,7 @@ def get_videos_from_subreddit(number_of_videos: int = 4):
             scrubber_media_url = video_data.get("fallback_url")
 
             if (
-                10 <= duration <= 12
+                5 <= duration <= 12
                 and height >= 1000
                 and width >= 1000
                 and scrubber_media_url
@@ -138,7 +146,7 @@ def get_videos_from_subreddit(number_of_videos: int = 4):
                     }
                 )
     logger.info("Videos retrieved successfully")
-    videos = random.sample(videos, k=number_of_videos + 1)
+    videos = random.sample(videos, k=number_of_videos + 3)
     return [
         MediaFile(
             name=video.get("title"),
@@ -173,7 +181,7 @@ def combine_video_and_audio(
         video=input_videos,
         audio=input_audio,
         output_location=output_file,
-        aws_s3_client=aws_s3_client,
+        aws_client=aws_s3_client,
         aws_settings=aws_settings,
     )
 
@@ -182,40 +190,41 @@ def combine_video_and_audio(
     return process
 
 
-def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
+def convert_text_to_audio(
+    polly_client: boto3.client, s3_client: boto3.client, name: str, text: Story
+) -> MediaFile | None:
     """
     Converts text to audio using the provided client and text, then uploads the audio file to S3.
-    
+
     Parameters:
         client: The client used for text-to-speech conversion.
         name: The name of the audio file.
         text: The text content to convert to audio.
-    
+
     Returns:
         MediaFile or None: The generated MediaFile object with audio details, or None if the upload fails.
     """
-   
 
     logger.info("Converting text to audio")
     media_file = MediaFile(name=name, file_type=SupportedMediaFileType.AUDIO)
+    media_file.set_location(settings=aws_settings)
     try:
         kwargs = {
             "Engine": "standard",
             "OutputFormat": "mp3",
             "Text": text.text,
-            "VoiceId":"Matthew",
-            "LanguageCode":None
+            "VoiceId": "Matthew",
+            "LanguageCode": "en-US",
         }
-        
-        response = client.synthesize_speech(**kwargs)
-        audio_stream = response["AudioStream"]
+
+        response = polly_client.synthesize_speech(**kwargs)
+        audio_stream = response["AudioStream"].read()
         with NamedTemporaryFile() as tempfile:
             with open(tempfile.name, "wb") as f:
-                for chunk in audio_stream.iter_content(chunk_size=1024):
-                    f.write(chunk)
+                f.write(audio_stream)
             logger.info("Uploading audio to S3")
             upload = upload_file_to_s3(
-                client,
+                s3_client,
                 media_file=media_file,
                 file_location=tempfile.name,
                 aws_settings=aws_settings,
@@ -225,9 +234,32 @@ def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
                 return None
             logger.info("Audio converted successfully")
     except ClientError as e:
-        logger.exception("Yo! something broke when I tried to generate the audio, %s", e)
+        logger.exception(
+            "Yo! something broke when I tried to generate the audio, %s", e
+        )
     else:
         return media_file.set_duration()
+
+
+def transcribe_audio(client,*, audio: MediaFile):
+    client.start_transcription_job(
+        TranscriptionJobName=audio.name,
+        Media={"MediaFileUri": audio.url},
+        MediaFormat="wav",
+        LanguageCode="en-US",
+    )
+    for _ in range(60):
+        job = client.get_transcription_job(TranscriptionJobName=audio.name)
+        job_status = job["TranscriptionJob"]["TranscriptionJobStatus"]
+        if job_status in ["COMPLETED", "FAILED"]:
+            print(f"Job {audio.name} is {job_status}.")
+            if job_status == "COMPLETED":
+                return job['TranscriptionJob']['Transcript']['TranscriptFileUri']
+            break
+        else:
+            print(f"Waiting for {audio.name}. Current status is {job_status}.")
+        time.sleep(10)
+
 
 
 def open_prompt_txt(prompt_txt: str) -> str:
@@ -468,43 +500,44 @@ def check_existing_redis_index(index_name: str) -> bool:
 
 
 def main():
-    prompt = "Write on how nigeria got her name"
-    entities = extract_entities(text=prompt)
-    tokens = [wiki_search(entity) for entity in entities]
-    tokens = list(itertools.chain(*tokens))
-    indexes = []
-    for token in tokens:
-        print(token)
-        logger.info("Checking existing redis index")
-        if not check_existing_redis_index(token):
-            logger.info("Creating new redis index: %s", token)
-            logger.info("Getting page content")
-            page = get_page_content(token)
-            logger.info("Chunking and saving text")
-            chunk = chunk_and_save(page)
-            if not chunk:
-                continue
-        indexes.append(token)
-    logger.info("Done checking and creating redis indexes")
-    
-    documents = return_documents(
-        prompt,
-        index_names=indexes,
-    )
-    checked_prompt = check_user_prompt(text=prompt, valid_documents=documents)
-    if not checked_prompt:
-        print("mate, this never happened or I am to old to remember 🥲")
-        return
-    story = generate_story(user_prompt=prompt, context_documents=documents)
-    audio = convert_text_to_audio(client=aws_s3_client, text=story, name=prompt)
-    number_of_videos = int(audio.duration // 10)
-    videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
-    output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
-    combine_video_and_audio(
-        input_audio_file=audio, input_video_files=videos, output_file=output_file
-    )
+    # prompt = "Write on how nigeria got her name"
+    # entities = extract_entities(text=prompt)
+    # tokens = [wiki_search(entity) for entity in entities]
+    # tokens = list(itertools.chain(*tokens))
+    # indexes = []
+    # for token in tokens:
+    #     logger.info("Checking existing redis index")
+    #     if not check_existing_redis_index(token):
+    #         logger.info("Creating new redis index: %s", token)
+    #         logger.info("Getting page content")
+    #         page = get_page_content(token)
+    #         logger.info("Chunking and saving text")
+    #         chunk = chunk_and_save(page)
+    #         if not chunk:
+    #             continue
+    #     indexes.append(token)
+    # logger.info("Done checking and creating redis indexes")
 
+    # documents = return_documents(
+    #     prompt,
+    #     index_names=indexes,
+    # )
+    # checked_prompt = check_user_prompt(text=prompt, valid_documents=documents)
+    # if not checked_prompt:
+    #     print("mate, this never happened or I am to old to remember 🥲")
+    #     return
+    # story = generate_story(user_prompt=prompt, context_documents=documents)
+    # audio = convert_text_to_audio(
+    #     polly_client=aws_polly_client, s3_client=aws_s3_client, text=story, name=prompt
+    # )
+    # number_of_videos = int(audio.duration // 10)
+    # videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
+    # output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
+    # combine_video_and_audio(
+    #     input_audio_file=audio, input_video_files=videos, output_file=output_file
+    # )
+    media_file = MediaFile(name="Hello transcribe", file_type=SupportedMediaFileType.AUDIO, url="https://askebun.s3.amazonaws.com/output_test.mp4")
+    transcribe_audio(aws_transcribe_client, job_name="transcribe_audio", audio=media_file)
 
 if __name__ == "__main__":
     main()
-

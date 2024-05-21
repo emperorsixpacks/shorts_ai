@@ -458,7 +458,7 @@ class PyAss:
 
 if __name__ == "__main__":
     transcripts = Transcript.open_transcript_json(
-        file_path="/home/emperorsixpacks/Downloads/asrOutput(1).json"
+        file_path="/home/emperorsixpacks/Downloads/asrOutput(2).json"
     )
     ordering_format = Format(
         fields=[

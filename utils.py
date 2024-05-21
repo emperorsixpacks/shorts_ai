@@ -61,7 +61,18 @@ class MediaFile:
 
             case SupportedMediaFileType.AUDIO:
                 return f"audio_{self.name}-{self.timestamp}.{self.file_type}"
-
+        
+    def set_location(self, settings: AWSSettings) -> Self:
+        """
+        Sets the location URL of the media file by combining the fastly URL from the provided 'settings' with the file name.
+        
+        Args:
+            settings (AWSSettings): The settings object containing the fastly URL.
+        
+        Returns:
+            Self: The updated instance of the MediaFile with the URL set.
+        """
+        self.url = f"{settings.fastly_url}{self.name}"
 
     def set_duration(self) -> Self:
         """
