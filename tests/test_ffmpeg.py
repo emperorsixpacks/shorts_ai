@@ -9,7 +9,7 @@ input_medai_file_1 = MediaFile(name="test_input_file_1", url="test_video.mp4", f
 input_medai_file_2 = MediaFile(name="test_input_file_2", url="test_audio.mp3", file_type=SupportedMediaFileType.AUDIO)
 input_video = InputFile(media_file=input_medai_file_1)
 input_audio = InputFile(media_file=input_medai_file_2)
-output_location = MediaFile(ame="test", url="output.mp4")
+output_location = MediaFile(name="test", url="output.mp4")
 aws_settings = AWSSettings(bucket="test_bucket", region="us-west-1")
 
 # Mock FFmpeg functions
