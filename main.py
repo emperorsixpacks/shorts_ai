@@ -5,7 +5,6 @@ import time
 from typing import List, Dict
 from tempfile import NamedTemporaryFile
 from functools import lru_cache
-import itertools
 
 import requests
 import wikipediaapi
@@ -244,7 +243,7 @@ def convert_text_to_audio(
 def transcribe_audio(client,*, audio: MediaFile):
     client.start_transcription_job(
         TranscriptionJobName=audio.name,
-        Media={"MediaFileUri": audio.url},
+        Media={"MediaFileUri": audio.get_s3_location()},
         MediaFormat="wav",
         LanguageCode="en-US",
     )
@@ -536,8 +535,8 @@ def main():
     # combine_video_and_audio(
     #     input_audio_file=audio, input_video_files=videos, output_file=output_file
     # )
-    media_file = MediaFile(name="Hello transcribe", file_type=SupportedMediaFileType.AUDIO, url="https://askebun.s3.amazonaws.com/output_test.mp4")
-    transcribe_audio(aws_transcribe_client, job_name="transcribe_audio", audio=media_file)
+    media_file = MediaFile(name="Hello transcribe", file_type=SupportedMediaFileType.AUDIO, url="ebun.global.ssl.fastly.net/audio_write_on_how_nigeria_got_her_name-1715228817.wav")
+    transcribe_audio(aws_transcribe_client, audio=media_file)
 
 if __name__ == "__main__":
     main()

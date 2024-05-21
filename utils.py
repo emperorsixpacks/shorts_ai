@@ -90,6 +90,10 @@ class MediaFile:
             self.duration = float(ffmpeg.probe(self.url)["format"]["duration"])
             return self
         return None
+    
+    def get_s3_location(self, settings: AWSSettings):
+        return f"{settings.s3_url}{self.name}"
+        
 
 
 class AWSS3Method(StrEnum):

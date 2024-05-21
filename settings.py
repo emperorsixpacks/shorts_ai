@@ -90,6 +90,7 @@ class AWSSettings(BaseConfig):
         aws_access_key (str): AWS access key.
     """
     fastly_url: str = None
+    s3_url: str = None
     aws_secret_key: str = None
     aws_access_key: str = None
     s3_bucket: str = None
