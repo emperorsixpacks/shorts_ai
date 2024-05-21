@@ -7,7 +7,7 @@ import logging
 from tempfile import NamedTemporaryFile
 
 import ffmpeg
-from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator, HttpUrl, FilePath
 from py_ffmpeg.exceptions import UnsupportedMediaFileError
 from utils import MediaFile, SupportedMediaFileType, upload_file_to_s3
 from settings import AWSSettings
@@ -71,9 +71,10 @@ class PyFFmpeg(BaseModel):
     overwrite: bool = Field(default=True)
     aws_client: Any
     aws_settings: AWSSettings
+    subtitle: HttpUrl | FilePath = Field(default=None, description="This should be Advanced Substation Subtiles (.ass)")
     filter_stream: FilterableStream = Field(init=False, default=None)
     
-    # @classmethod
+    @classmethod
     @field_validator("video", mode="after")
     def rescale_video(cls, videos: List[InputFile]) -> List[FilterableStream]:
         """
@@ -142,7 +143,8 @@ class PyFFmpeg(BaseModel):
             self.audio.stream,
             "pipe:",
             shortest=None,
-            f='mpegts'
+            f='mpegts',
+            vf=f"ass={self.subtitle}"
         )
         
         try:

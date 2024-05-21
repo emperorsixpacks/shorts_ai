@@ -161,6 +161,7 @@ def combine_video_and_audio(
     input_video_files: List[MediaFile],
     input_audio_file: MediaFile,
     output_file: MediaFile,
+    transcript: str = None,
 ) -> MediaFile:
     """
     Combines multiple video files with a single audio file into a single MP4 using FFmpeg.
@@ -240,7 +241,7 @@ def convert_text_to_audio(
         return media_file.set_duration()
 
 
-def transcribe_audio(client,*, audio: MediaFile):
+def transcribe_audio(client, *, audio: MediaFile):
     client.start_transcription_job(
         TranscriptionJobName=audio.name,
         Media={"MediaFileUri": audio.get_s3_location()},
@@ -253,12 +254,11 @@ def transcribe_audio(client,*, audio: MediaFile):
         if job_status in ["COMPLETED", "FAILED"]:
             print(f"Job {audio.name} is {job_status}.")
             if job_status == "COMPLETED":
-                return job['TranscriptionJob']['Transcript']['TranscriptFileUri']
+                return job["TranscriptionJob"]["Transcript"]["TranscriptFileUri"]
             break
         else:
             print(f"Waiting for {audio.name}. Current status is {job_status}.")
         time.sleep(10)
-
 
 
 def open_prompt_txt(prompt_txt: str) -> str:
@@ -499,44 +499,47 @@ def check_existing_redis_index(index_name: str) -> bool:
 
 
 def main():
-    # prompt = "Write on how nigeria got her name"
-    # entities = extract_entities(text=prompt)
-    # tokens = [wiki_search(entity) for entity in entities]
-    # tokens = list(itertools.chain(*tokens))
-    # indexes = []
-    # for token in tokens:
-    #     logger.info("Checking existing redis index")
-    #     if not check_existing_redis_index(token):
-    #         logger.info("Creating new redis index: %s", token)
-    #         logger.info("Getting page content")
-    #         page = get_page_content(token)
-    #         logger.info("Chunking and saving text")
-    #         chunk = chunk_and_save(page)
-    #         if not chunk:
-    #             continue
-    #     indexes.append(token)
-    # logger.info("Done checking and creating redis indexes")
+    prompt = "Write on how nigeria got her name"
+    entities = extract_entities(text=prompt)
+    tokens = [wiki_search(entity) for entity in entities]
+    tokens = list(itertools.chain(*tokens))
+    indexes = []
+    for token in tokens:
+        logger.info("Checking existing redis index")
+        if not check_existing_redis_index(token):
+            logger.info("Creating new redis index: %s", token)
+            logger.info("Getting page content")
+            page = get_page_content(token)
+            logger.info("Chunking and saving text")
+            chunk = chunk_and_save(page)
+            if not chunk:
+                continue
+        indexes.append(token)
+    logger.info("Done checking and creating redis indexes")
 
-    # documents = return_documents(
-    #     prompt,
-    #     index_names=indexes,
-    # )
-    # checked_prompt = check_user_prompt(text=prompt, valid_documents=documents)
-    # if not checked_prompt:
-    #     print("mate, this never happened or I am to old to remember 🥲")
-    #     return
-    # story = generate_story(user_prompt=prompt, context_documents=documents)
-    # audio = convert_text_to_audio(
-    #     polly_client=aws_polly_client, s3_client=aws_s3_client, text=story, name=prompt
-    # )
-    # number_of_videos = int(audio.duration // 10)
-    # videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
-    # output_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
-    # combine_video_and_audio(
-    #     input_audio_file=audio, input_video_files=videos, output_file=output_file
-    # )
-    media_file = MediaFile(name="Hello transcribe", file_type=SupportedMediaFileType.AUDIO, url="ebun.global.ssl.fastly.net/audio_write_on_how_nigeria_got_her_name-1715228817.wav")
-    transcribe_audio(aws_transcribe_client, audio=media_file)
+    documents = return_documents(
+        prompt,
+        index_names=indexes,
+    )
+    checked_prompt = check_user_prompt(text=prompt, valid_documents=documents)
+    if not checked_prompt:
+        print("mate, this never happened or I am to old to remember 🥲")
+        return
+    story = generate_story(user_prompt=prompt, context_documents=documents)
+    audio_file = convert_text_to_audio(
+        polly_client=aws_polly_client, s3_client=aws_s3_client, text=story, name=prompt
+    )
+    number_of_videos = int(audio_file.duration // 10)
+    videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
+    video_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
+    trascript = transcribe_audio(aws_transcribe_client, audio=audio_file)
+    combine_video_and_audio(
+        input_audio_file=audio_file,
+        input_video_files=videos,
+        output_file=video_file,
+        transcript=trascript,
+    )
+
 
 if __name__ == "__main__":
     main()
