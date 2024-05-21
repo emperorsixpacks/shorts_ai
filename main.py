@@ -45,7 +45,7 @@ from utils import (
 )
 
 from py_ffmpeg.main import PyFFmpeg, InputFile
-from ass_parser import Transcript, Style, Dialogue, Section, PyAss, Format
+from ass_parser.main import Transcript, Style, Dialogue, Section, PyAss, Format
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -247,7 +247,7 @@ def convert_text_to_audio(
 def transcribe_audio(client, *, audio: MediaFile):
     client.start_transcription_job(
         TranscriptionJobName=audio.name,
-        Media={"MediaFileUri": audio.get_s3_location()},
+        Media={"MediaFileUri": audio.get_s3_location(settings=aws_settings)},
         MediaFormat="wav",
         LanguageCode="en-US",
     )
@@ -536,10 +536,8 @@ def main():
     videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
     video_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
     trascript = transcribe_audio(aws_transcribe_client, audio=audio_file)
-    
-    transcripts = Transcript.open_transcript_json(
-        file_path=trascript
-    )
+
+    transcripts = Transcript.open_transcript_json(file_path=trascript)
     ordering_format = Format(
         fields=[
             "Name",
@@ -551,13 +549,28 @@ def main():
             "BackgroundColor",
         ]
     )
-    
-    
-    style = Style(ordering_format=ordering_format)
-    dialogue_format = Format(fields=["Layer", "Start", "End", "Style", "MarginL", "MarginR", "MarginV", "Text"])
-    
-    dialogues = Dialogue.from_list(transcripts, style=style, ordering_format=dialogue_format, focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}")
-    
+
+    style = Style(order_format=ordering_format)
+    dialogue_format = Format(
+        fields=[
+            "Layer",
+            "Start",
+            "End",
+            "Style",
+            "MarginL",
+            "MarginR",
+            "MarginV",
+            "Text",
+        ]
+    )
+
+    dialogues = Dialogue.from_list(
+        transcripts,
+        dialogue_style=style,
+        ordering_format=dialogue_format,
+        focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}",
+    )
+
     event_fields = [["Format", dialogue_format.return_fields_str()]]
 
     for dialogue in dialogues:
@@ -569,7 +582,7 @@ def main():
     with NamedTemporaryFile(suffix=".ass") as subtitle:
         with PyAss(subtitle.name, "w", sections=[events]) as ass:
             ass.write()
-            
+
         combine_video_and_audio(
             input_audio_file=audio_file,
             input_video_files=videos,

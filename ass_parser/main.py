@@ -14,6 +14,7 @@ import numpy as np
 
 from ass_parser.exceptions import UnsupportedFileFormat
 
+
 @dataclass
 class Transcript:
     """
@@ -102,9 +103,9 @@ class Transcript:
                 data = json.load(f)
         except FileNotFoundError as e:
             regex_patttern = r"^((http|https):\/\/)?([^\s]+\.[^\s]+)?(\/[^\s]*)?$"
-            if re.match(pattern=regex_patttern, string=file_path).groups[0] is None:
+            if re.match(pattern=regex_patttern, string=file_path).groups()[0] is None:
                 raise FileNotFoundError(f"File not found: {file_path}") from e
-            data  = requests.get(file_path, timeout=60).content
+            data = requests.get(file_path, timeout=60).json()
         _transcripts = []
         for item in data["results"]["items"]:
             text: str = item["alternatives"][0]["content"]
@@ -121,6 +122,7 @@ class Transcript:
         num_sections = int(len(_transcripts) / 5)
         np_array = np.array_split(_transcripts, num_sections)
         return [array.tolist() for array in np_array]
+
 
 class Format(BaseModel):
     """
@@ -159,7 +161,7 @@ class Entry(BaseModel):
     title: str = Field(default="Default", exclude=True, frozen=True, init=False)
     """The title of the entry."""
 
-    order_format: Format = Field(exclude=True)
+    order_format: Format = Field(exclude=True, default=None)
     """The format of the entry."""
 
     @model_validator(mode="after")
@@ -177,22 +179,20 @@ class Entry(BaseModel):
             Self: The instance of the model with validated fields.
 
         Raises:
-            ValueError: If the field at a specific index does not match the corresponding key in `self.ordering_format.fields`.
+            ValueError: If the field at a specific index does not match the corresponding key in `self.order_format.fields`.
         """
-        fields = self.model_dump(by_alias=True).keys()
+        fields = self.model_dump(by_alias=True)
         if self.order_format is None:
             raise ValueError("order_format cannot be None")
-        for _, key in enumerate(fields):
-            if key not in self.order_format.fields:
-                raise ValueError(
-                    f"{key} doesn't exist in {self.order_format.fields}"
-                )
+        for _, key in enumerate(self.order_format.fields):
+            if fields.get(key, None) is None:
+                raise ValueError(f"{key} doesn't exist in {self.order_format.fields}")
 
         return self
 
     def _reorder_and_return_fields(self) -> Dict:
         fields = self.model_dump(by_alias=True)
-
+        print({key: str(fields[key]) for key in self.order_format.fields}.keys())
         return {key: str(fields.get(key, None)) for key in self.order_format.fields}
 
     def return_entry_str(self) -> str:
@@ -335,7 +335,7 @@ class Dialogue(Entry):
         dialogue_style: Style = None,
         order_format: Format = None,
         focus_style: str = None,
-        **kwargs
+        **kwargs,
     ) -> List[Self]:
         """
         Creates a list of Dialogue objects from a list of lists of dictionaries.
@@ -374,8 +374,8 @@ class Dialogue(Entry):
                             end_time=end_time,
                             text=f'{" ".join(text)} {focus_text}',
                             style=dialogue_style,
-                            ordering_format=order_format,
-                            **kwargs
+                            order_format=order_format,
+                            **kwargs,
                         ).return_entry_str(),
                     ]
                 )
@@ -489,14 +489,26 @@ if __name__ == "__main__":
 
     style = Style(order_format=ordering_format)
     print(style.return_entry_str())
-    # dialogue_format = Format(fields=["Layer", "Start", "End", "Style", "MarginL", "MarginR", "MarginV", "Text"])
-    # # print(Dialogue(Text="Hello", style=style, Start=1111, End=222, ordering_format=dialogue_format))
-    # dialogues = Dialogue.from_list(
-    #     transcripts,
-    #     style=style,
-    #     order_format=dialogue_format,
-    #     focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}",
-    # )
+    dialogue_format = Format(
+        fields=[
+            "Layer",
+            "Start",
+            "End",
+            "Style",
+            "MarginL",
+            "MarginR",
+            "MarginV",
+            "Text",
+        ]
+    )
+    # print(Dialogue(Text="Hello", style=style, Start=1111, End=222, ordering_format=dialogue_format))
+    dialogues = Dialogue.from_list(
+        transcripts,
+        dialogue_style=style,
+        order_format=dialogue_format,
+        focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}",
+        MarginL=1,
+    )
     # dialogue = Dialogue(ordering_format=dialogue_format, style=style)
 
     # sript_info = Section(title="Script Info", fields=(["title", "Sample project"]))
