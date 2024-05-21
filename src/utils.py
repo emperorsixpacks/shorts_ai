@@ -13,7 +13,7 @@ from botocore.exceptions import ClientError
 import ffmpeg
 
 if TYPE_CHECKING:
-    from settings import AWSSettings
+    from src.settings import AWSSettings
 
 
 class SupportedMediaFileType(StrEnum):

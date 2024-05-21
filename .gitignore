@@ -7,8 +7,9 @@ ibm-credentials.env
 *.pyc
 __pycache__/
 export_env
-demo.py
+src/demo.py
 hello.wav
 activate
 .activate.swp
 *.ass
+*.json

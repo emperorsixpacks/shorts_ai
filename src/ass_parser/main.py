@@ -2,17 +2,17 @@ from __future__ import annotations
 import os
 import re
 import json
-import requests
 from datetime import datetime, timedelta
 from typing import Dict, List, Self
 from dataclasses import dataclass, field
 import string
 
+import requests
 import num2words
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 import numpy as np
 
-from ass_parser.exceptions import UnsupportedFileFormat
+from exceptions import UnsupportedFileFormat
 
 
 @dataclass
@@ -192,7 +192,6 @@ class Entry(BaseModel):
 
     def _reorder_and_return_fields(self) -> Dict:
         fields = self.model_dump(by_alias=True)
-        print({key: str(fields[key]) for key in self.order_format.fields}.keys())
         return {key: str(fields.get(key, None)) for key in self.order_format.fields}
 
     def return_entry_str(self) -> str:
@@ -508,6 +507,8 @@ if __name__ == "__main__":
         order_format=dialogue_format,
         focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}",
         MarginL=1,
+        MarginR=1,
+        MarginV=1
     )
     # dialogue = Dialogue(ordering_format=dialogue_format, style=style)
 

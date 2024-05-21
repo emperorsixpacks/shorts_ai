@@ -27,7 +27,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings.huggingface import HuggingFaceBgeEmbeddings
 from langchain.vectorstores.redis import RedisVectorStoreRetriever, Redis
 
-from src.settings import (
+from settings import (
     RedditSettings,
     RedisSettings,
     EmbeddingSettings,
@@ -36,16 +36,17 @@ from src.settings import (
     AWSSettings,
 )
 
-from src.utils import (
-    MediaFile,
+from utils import (
+    MediaFile, 
     Story,
-    WikiPage,
-    SupportedMediaFileType,
-    upload_file_to_s3,
+    WikiPage, 
+    SupportedMediaFileType, 
+    upload_file_to_s3
 )
 
-from py_ffmpeg.main import PyFFmpeg, InputFile
-from ass_parser.main import Transcript, Style, Dialogue, Section, PyAss, Format
+from src.py_ffmpeg.main import PyFFmpeg, InputFile
+from src.ass_parser.main import Transcript, Style, Dialogue, Section, PyAss, Format
+    
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -309,7 +310,7 @@ def check_user_prompt(text: str, valid_documents: List[Document]) -> bool:
         top_p=0.2,
         top_k=10,
     )
-    system_message = open_prompt_txt("validation_prompt.txt")
+    system_message = open_prompt_txt("../prompts/validation_prompt.txt")
     messages = [
         SystemMessage(content=system_message),
         HumanMessage(content=f"user text: {text} \n docuemnts: {valid_documents}"),
@@ -343,7 +344,7 @@ def generate_story(user_prompt: str, context_documents: List[Document]) -> Story
         topP=0.2,
     )
 
-    prompt_template = open_prompt_txt("prompt.txt")
+    prompt_template = open_prompt_txt("../prompts/prompt.txt")
     final_prompt = PromptTemplate(
         input_variables=["documents", "user"],
         template=prompt_template,
