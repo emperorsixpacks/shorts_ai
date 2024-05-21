@@ -74,8 +74,8 @@ class PyFFmpeg(BaseModel):
     subtitle: FilePath = Field(default=None, description="This should be Advanced Substation Subtiles (.ass)")
     filter_stream: FilterableStream = Field(init=False, default=None)
     
+    @field_validator("video")
     @classmethod
-    @field_validator("video", mode="after")
     def rescale_video(cls, videos: List[InputFile]) -> List[FilterableStream]:
         """
         Validates the "video" field after it has been set.
@@ -90,7 +90,6 @@ class PyFFmpeg(BaseModel):
         Raises:
             None
         """
-        # print(videos)
         video_streams = []
         for video in videos:
             video_stream = video.stream 
@@ -107,7 +106,7 @@ class PyFFmpeg(BaseModel):
         Returns:
             Self: The modified object with the concatenated video stream.
         """
-        self.filter_stream = ffmpeg.concat(*[stream for stream in self.video], v=1, a=0)
+        self.filter_stream = ffmpeg.concat(*self.video, v=1, a=0)
         return self
 
     def trim_video(self, end: int = None) -> Self:
