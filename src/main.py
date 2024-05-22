@@ -44,8 +44,8 @@ from utils import (
     upload_file_to_s3
 )
 
-from src.py_ffmpeg.main import PyFFmpeg, InputFile
-from src.ass_parser.main import Transcript, Style, Dialogue, Section, PyAss, Format
+from py_ffmpeg.main import PyFFmpeg, InputFile
+from ass_parser.main import Transcript, Style, Dialogue, Section, PyAss, Format
     
 
 logger = logging.getLogger(__name__)

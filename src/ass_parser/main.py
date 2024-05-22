@@ -12,7 +12,7 @@ import num2words
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 import numpy as np
 
-from exceptions import UnsupportedFileFormat
+from .exceptions import UnsupportedFileFormat
 
 
 @dataclass

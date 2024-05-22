@@ -8,8 +8,8 @@ from tempfile import NamedTemporaryFile
 
 import ffmpeg
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator, FilePath
-from src.utils import MediaFile, SupportedMediaFileType, upload_file_to_s3
-from src.settings import AWSSettings
+from utils import MediaFile, SupportedMediaFileType, upload_file_to_s3
+from settings import AWSSettings
 
 from .exceptions import UnsupportedMediaFileError
 
