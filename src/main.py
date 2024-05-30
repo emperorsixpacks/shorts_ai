@@ -194,56 +194,45 @@ def combine_video_and_audio(
     return process
 
 
-def convert_text_to_audio(
-    polly_client: boto3.client, s3_client: boto3.client, name: str, text: Story
-) -> MediaFile | None:
+def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
     """
-    Converts text to audio using the provided client and text, then uploads the audio file to S3.
-
+    Converts text to audio using the TTSMP3 API.
     Parameters:
-        client: The client used for text-to-speech conversion.
-        name: The name of the audio file.
-        text: The text content to convert to audio.
-
+        client (Client): The AWS client.
+        name (str): The name of the audio file.
+        text (Story): The text to be converted to audio.
     Returns:
-        MediaFile or None: The generated MediaFile object with audio details, or None if the upload fails.
+        MediaFile | None: The converted audio file if successful, None otherwise.
     """
 
     logger.info("Converting text to audio")
     media_file = MediaFile(name=name, file_type=SupportedMediaFileType.AUDIO)
-    media_file.set_location(settings=aws_settings)
-    try:
-        kwargs = {
-            "Engine": "standard",
-            "OutputFormat": "mp3",
-            "Text": text.text,
-            "VoiceId": "Matthew",
-            "LanguageCode": "en-US",
-        }
-
-        response = polly_client.synthesize_speech(**kwargs)
-        audio_stream = response["AudioStream"].read()
-        with NamedTemporaryFile() as tempfile:
+    data = {"msg": text.text, "lang": "Matthew", "source": "ttsmp3"}
+    audio_url = requests.post(
+        "https://ttsmp3.com/makemp3_new.php", data=data, timeout=60
+    ).json()["URL"]
+    media_file.url = audio_url
+    with NamedTemporaryFile() as tempfile:
+        r = requests.get(audio_url, stream=True, timeout=60)
+        if r.status_code == 200:
             with open(tempfile.name, "wb") as f:
-                f.write(audio_stream)
-            logger.info("Uploading audio to S3")
-            upload = upload_file_to_s3(
-                s3_client,
-                media_file=media_file,
-                file_location=tempfile.name,
-                aws_settings=aws_settings,
-            )
-            if not upload:
-                logger.warning("Failed to upload audio to S3")
-                return None
-            logger.info("Audio converted successfully")
-    except ClientError as e:
-        logger.exception(
-            "Yo! something broke when I tried to generate the audio, %s", e
+                for chunk in r.iter_content(chunk_size=1024):
+                    f.write(chunk)
+        else:
+            logger.warning("Failed to download audio from TTSMP3")
+            return None
+        logger.info("Uploading audio to S3")
+        upload = upload_file_to_s3(
+            client,
+            media_file=media_file,
+            file_location=tempfile.name,
+            aws_settings=aws_settings,
         )
-    else:
-        return media_file.set_duration()
-
+        if not upload:
+            logger.warning("Failed to upload audio to S3")
+            return None
+    logger.info("Audio converted successfully")
+    return media_file.set_duration()
 
 def transcribe_audio(client, *, audio: MediaFile):
     client.start_transcription_job(
@@ -530,8 +519,7 @@ def main():
         print("mate, this never happened or I am to old to remember 🥲")
         return
     story = generate_story(user_prompt=prompt, context_documents=documents)
-    audio_file = convert_text_to_audio(
-        polly_client=aws_polly_client, s3_client=aws_s3_client, text=story, name=prompt
+    audio_file = convert_text_to_audio(aws_s3_client, text=story, name=prompt
     )
     number_of_videos = int(audio_file.duration // 10)
     videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
