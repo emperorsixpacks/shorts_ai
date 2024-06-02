@@ -81,18 +81,19 @@ class LLMSettings(BaseConfig):
     deepinfra_api_key: str = None
 
 
-class AWSSettings(BaseConfig):
+class BucketSettings(BaseConfig):
     """
-    Settings for AWS credentials.
+    Settings for AWS S3 credentials and bucket information.
 
     Attributes:
-        aws_secret_key (str): AWS secret key.
-        aws_access_key (str): AWS access key.
+        bucket_secret_key (str): The secret key for the AWS S3 bucket.
+        bucket_api_key (str): The API key for the AWS S3 bucket.
+        bucket_name (str): The name of the AWS S3 bucket.
     """
-    fastly_url: str = None
-    s3_url: str = None
-    aws_secret_key: str = None
-    aws_access_key: str = None
-    s3_bucket: str = None
+   
+    bucket_secret_key: str = None
+    bucket_api_key: str = None
+    bucket_name: str = None
+
 
 

@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from datetime import datetime
 
-from botocore.exceptions import ClientError
+# from botocore.exceptions import ClientError
 import ffmpeg
 
 if TYPE_CHECKING:
@@ -167,15 +167,15 @@ def upload_file_to_s3(
     Returns:
     None
     """
-    try:
-        print("uplading file to s3")
-        with open(file_location, "rb") as file:
-            aws_client.upload_fileobj(
-                Fileobj=file, Bucket=aws_settings.s3_bucket, Key=media_file.name, ExtraArgs={
-                    "ContentType":media_file.file_type
-                }
-            )
-    except ClientError:
-        return False
-    print("Done uploading file to s3")
+    # try:
+    #     print("uplading file to s3")
+    #     with open(file_location, "rb") as file:
+    #         aws_client.upload_fileobj(
+    #             Fileobj=file, Bucket=aws_settings.s3_bucket, Key=media_file.name, ExtraArgs={
+    #                 "ContentType":media_file.file_type
+    #             }
+    #         )
+    # except ClientError:
+    #     return False
+    # print("Done uploading file to s3")
     return True

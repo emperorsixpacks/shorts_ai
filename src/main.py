@@ -10,8 +10,7 @@ from functools import lru_cache
 import requests
 import wikipediaapi
 import praw
-import boto3
-from botocore.exceptions import ClientError
+import ibm_boto3
 
 from huggingface_hub import InferenceClient
 from redisvl.index import SearchIndex
@@ -36,17 +35,11 @@ from settings import (
     AWSSettings,
 )
 
-from utils import (
-    MediaFile, 
-    Story,
-    WikiPage, 
-    SupportedMediaFileType, 
-    upload_file_to_s3
-)
+from utils import MediaFile, Story, WikiPage, SupportedMediaFileType, upload_file_to_s3
 
 from py_ffmpeg.main import PyFFmpeg, InputFile
 from ass_parser.main import Transcript, Style, Dialogue, Section, PyAss, Format
-    
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -66,31 +59,32 @@ redis_settings = RedisSettings()
 embeddings_settings = EmbeddingSettings()
 llm_settings = LLMSettings()
 hf_hub_settings = HuggingFaceHubSettings()
-aws_settings = AWSSettings()
+# aws_settings = AWSSettings()
 
 WIKI_API_SEARCH_URL = "https://en.wikipedia.org/w/rest.php/v1/search/page?q={}&limit=4"
 redis_url = f"redis://{redis_settings.redis_host}:{redis_settings.redis_port}"
 wiki_wiki = wikipediaapi.Wikipedia("MyProjectName (merlin@example.com)", "en")
 ner_model = InferenceClient(token=hf_hub_settings.HuggingFacehub_api_token)
 
-aws_s3_client = boto3.client(
-    "s3",
-    aws_access_key_id=aws_settings.aws_access_key,
-    aws_secret_access_key=aws_settings.aws_secret_key,
-)
 
-aws_polly_client = boto3.client(
-    "polly",
-    aws_access_key_id=aws_settings.aws_access_key,
-    aws_secret_access_key=aws_settings.aws_secret_key,
-    region_name="us-west-2",
-)
-aws_transcribe_client = boto3.client(
-    "transcribe",
-    aws_access_key_id=aws_settings.aws_access_key,
-    aws_secret_access_key=aws_settings.aws_secret_key,
-    region_name="us-east-1",
-)
+# aws_s3_client = boto3.client(
+#     "s3",
+#     aws_access_key_id=aws_settings.aws_access_key,
+#     aws_secret_access_key=aws_settings.aws_secret_key,
+# )
+
+# aws_polly_client = boto3.client(
+#     "polly",
+#     aws_access_key_id=aws_settings.aws_access_key,
+#     aws_secret_access_key=aws_settings.aws_secret_key,
+#     region_name="us-west-2",
+# )
+# aws_transcribe_client = boto3.client(
+#     "transcribe",
+#     aws_access_key_id=aws_settings.aws_access_key,
+#     aws_secret_access_key=aws_settings.aws_secret_key,
+#     region_name="us-east-1",
+# )
 
 
 @lru_cache
@@ -233,6 +227,7 @@ def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
             return None
     logger.info("Audio converted successfully")
     return media_file.set_duration()
+
 
 def transcribe_audio(client, *, audio: MediaFile):
     client.start_transcription_job(
@@ -519,70 +514,71 @@ def main():
         print("mate, this never happened or I am to old to remember 🥲")
         return
     story = generate_story(user_prompt=prompt, context_documents=documents)
-    audio_file = convert_text_to_audio(aws_s3_client, text=story, name=prompt
-    )
-    number_of_videos = int(audio_file.duration // 10)
-    videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
-    video_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
-    trascript = transcribe_audio(aws_transcribe_client, audio=audio_file)
+    print(story.text)
+    # audio_file = convert_text_to_audio(aws_s3_client, text=story, name=prompt
+    # )
+    # number_of_videos = int(audio_file.duration // 10)
+    # videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
+    # video_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
+    # trascript = transcribe_audio(aws_transcribe_client, audio=audio_file)
 
-    transcripts = Transcript.open_transcript_json(file_path=trascript)
-    ordering_format = Format(
-        fields=[
-            "Name",
-            "Fontname",
-            "Fontsize",
-            "PrimaryColour",
-            "SecondaryColour",
-            "OutlineColour",
-            "BackgroundColor",
-        ]
-    )
+    # transcripts = Transcript.open_transcript_json(file_path=trascript)
+    # ordering_format = Format(
+    #     fields=[
+    #         "Name",
+    #         "Fontname",
+    #         "Fontsize",
+    #         "PrimaryColour",
+    #         "SecondaryColour",
+    #         "OutlineColour",
+    #         "BackgroundColor",
+    #     ]
+    # )
 
-    style = Style(order_format=ordering_format)
-    dialogue_format = Format(
-        fields=[
-            "Layer",
-            "Start",
-            "End",
-            "Style",
-            "MarginL",
-            "MarginR",
-            "MarginV",
-            "Text",
-        ]
-    )
+    # style = Style(order_format=ordering_format)
+    # dialogue_format = Format(
+    #     fields=[
+    #         "Layer",
+    #         "Start",
+    #         "End",
+    #         "Style",
+    #         "MarginL",
+    #         "MarginR",
+    #         "MarginV",
+    #         "Text",
+    #     ]
+    # )
 
-    dialogues = Dialogue.from_list(
-        transcripts,
-        dialogue_style=style,
-        order_format=dialogue_format,
-        focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}",
-        MarginL=1,
-        MarginR=1,
-        MarginV=1
-    )
+    # dialogues = Dialogue.from_list(
+    #     transcripts,
+    #     dialogue_style=style,
+    #     order_format=dialogue_format,
+    #     focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}",
+    #     MarginL=1,
+    #     MarginR=1,
+    #     MarginV=1
+    # )
 
-    event_fields = [["Format", dialogue_format.return_fields_str()]]
+    # event_fields = [["Format", dialogue_format.return_fields_str()]]
 
-    for dialogue in dialogues:
-        event_fields.append(dialogue)
-    events = Section(
-        title="Events",
-        fields=event_fields,
-    )
-    with NamedTemporaryFile(suffix=".ass") as subtitle:
-        print("writing to file")
-        with PyAss(subtitle.name, "w", sections=[events]) as ass:
-            ass.write()
+    # for dialogue in dialogues:
+    #     event_fields.append(dialogue)
+    # events = Section(
+    #     title="Events",
+    #     fields=event_fields,
+    # )
+    # with NamedTemporaryFile(suffix=".ass") as subtitle:
+    #     print("writing to file")
+    #     with PyAss(subtitle.name, "w", sections=[events]) as ass:
+    #         ass.write()
 
-        combine_video_and_audio(
-            input_audio_file=audio_file,
-            input_video_files=videos,
-            output_file=video_file,
-            transcript=subtitle.name,
-        )
+    #     combine_video_and_audio(
+    #         input_audio_file=audio_file,
+    #         input_video_files=videos,
+    #         output_file=video_file,
+    #         transcript=subtitle.name,
+    #     )
 
 
 if __name__ == "__main__":
-    main()
+    # main()s
