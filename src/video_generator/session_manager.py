@@ -22,7 +22,7 @@ def create_session() -> requests.Session:
     return requests.Session()
 
 
-class Session(BaseModel):
+class SessionManager(BaseModel):
     url: AnyUrl
     session: requests.Session = Field(default_factory=create_session)
 
@@ -49,6 +49,9 @@ class Session(BaseModel):
             raise ServerTimeOutError(location=self.url) from e
 
         return responce
+    
+
+class Session(SessionManager):
 
     def is_valid_url(self):
         """
