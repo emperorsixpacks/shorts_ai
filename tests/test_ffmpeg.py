@@ -10,7 +10,7 @@ input_medai_file_2 = MediaFile(name="test_input_file_2", url="test_audio.mp3", f
 input_video = InputFile(media_file=input_medai_file_1)
 input_audio = InputFile(media_file=input_medai_file_2)
 output_location = MediaFile(name="test", url="output.mp4")
-aws_settings = AWSSettings(bucket="test_bucket", region="us-west-1")
+bucket_settings = AWSSettings(bucket="test_bucket", region="us-west-1")
 
 # Mock FFmpeg functions
 mock_video_stream = MagicMock()
@@ -27,8 +27,8 @@ def test_initialization():
         video=[input_video],
         audio=input_audio,
         output_location=output_location,
-        aws_client=MagicMock(),
-        aws_settings=aws_settings
+        s3_client=MagicMock(),
+        bucket_settings=bucket_settings
     )
     
     assert ffmpeg_instance.video == [input_video]
@@ -47,8 +47,8 @@ def test_concatinate_video():
         video=[input_video],
         audio=input_audio,
         output_location=output_location,
-        aws_client=MagicMock(),
-        aws_settings=aws_settings
+        s3_client=MagicMock(),
+        bucket_settings=bucket_settings
     )
     
     with patch('ffmpeg.concat', return_value=mock_video_stream):
@@ -60,8 +60,8 @@ def test_trim_video():
         video=[input_video],
         audio=input_audio,
         output_location=output_location,
-        aws_client=MagicMock(),
-        aws_settings=aws_settings
+        s3_client=MagicMock(),
+        bucket_settings=bucket_settings
     )
     
     with patch('ffmpeg.trim', return_value=mock_video_stream):
@@ -74,8 +74,8 @@ def test_execute():
         video=[input_video],
         audio=input_audio,
         output_location=output_location,
-        aws_client=MagicMock(),
-        aws_settings=aws_settings,
+        s3_client=MagicMock(),
+        bucket_settings=bucket_settings,
         subtitle=None
     )
 

@@ -13,7 +13,7 @@ from ibm_botocore.exceptions import ClientError
 import ffmpeg
 
 if TYPE_CHECKING:
-    from src.settings import AWSSettings
+    from src.settings import BucketSettings
 
 
 class SupportedMediaFileType(StrEnum):
@@ -62,12 +62,12 @@ class MediaFile:
             case SupportedMediaFileType.AUDIO:
                 return f"audio_{self.name}-{self.timestamp}.{self.file_type}"
         
-    def set_location(self, settings: AWSSettings) -> Self:
+    def set_location(self, settings: BucketSettings) -> Self:
         """
         Sets the location URL of the media file by combining the fastly URL from the provided 'settings' with the file name.
         
         Args:
-            settings (AWSSettings): The settings object containing the fastly URL.
+            settings (BucketSettings): The settings object containing the fastly URL.
         
         Returns:
             Self: The updated instance of the MediaFile with the URL set.
@@ -91,8 +91,16 @@ class MediaFile:
             return self
         return None
     
-    def get_s3_location(self, settings: AWSSettings):
-        return f"{settings.s3_url}{self.name}"
+    def get_s3_location(self, settings: BucketSettings) -> str:
+        """
+        Returns the S3 location of the media file based on the provided settings.
+
+        Args:
+            settings (BucketSettings): The settings object containing the S3 URL.
+
+        Returns:
+            str: The S3 location of the media file.
+        """
         
 
 
@@ -155,27 +163,37 @@ def upload_file_to_s3(
     *,
     media_file: MediaFile,
     file_location,
-    aws_settings: AWSSettings,
-):
+    bucket_settings: BucketSettings,
+) -> bool:
     """
-    Uploads file content to a specified S3 URL using PUT request.
+    Uploads a file to an S3 bucket.
 
-    Parameters:
-    url (str): The S3 URL to upload the file to.
-    file_content (bytes): The content of the file to upload.
+    Args:
+        s3_client: An S3 client object (aws or ibm cloud).
+        media_file: A MediaFile object containing metadata about the file.
+        file_location: The location of the file to upload.
+        bucket_settings: BucketSettings object containing settings for AWS.
 
     Returns:
-    None
+        bool: True if the file was successfully uploaded, False otherwise.
     """
     try:
-        print("uplading file to s3")
+        print("Uploading file to S3")
+
         with open(file_location, "rb") as file:
             s3_client.upload_fileobj(
-                Fileobj=file, Bucket=aws_settings.s3_bucket, Key=media_file.name, ExtraArgs={
-                    "ContentType":media_file.file_type
+                Fileobj=file,
+                Bucket=bucket_settings.bucket_name,
+                Key=media_file.name,
+                ExtraArgs={
+                    "ContentType": media_file.file_type
                 }
             )
+
     except ClientError:
         return False
-    print("Done uploading file to s3")
+    print("Done uploading file to S3")
     return True
+
+
+# TODO add interface for both AWS and IBM Cloud

@@ -9,7 +9,7 @@ from tempfile import NamedTemporaryFile
 import ffmpeg
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator, FilePath
 from utils import MediaFile, SupportedMediaFileType, upload_file_to_s3
-from settings import AWSSettings
+from settings import BucketSettings
 
 from .exceptions import UnsupportedMediaFileError
 
@@ -70,8 +70,8 @@ class PyFFmpeg(BaseModel):
     audio: InputFile
     output_location: MediaFile
     overwrite: bool = Field(default=True)
-    aws_client: Any
-    aws_settings: AWSSettings
+    s3_client: Any
+    bucket_settings: BucketSettings
     subtitle: FilePath = Field(default=None, description="This should be Advanced Substation Subtiles (.ass)")
     filter_stream: FilterableStream = Field(init=False, default=None)
     
@@ -158,10 +158,10 @@ class PyFFmpeg(BaseModel):
                 with open(temp_file.name, "wb") as f:
                     f.write(process[0])
                 upload = upload_file_to_s3(
-                    aws_client=self.aws_client,
+                    s3_client=self.s3_client,
                     media_file=self.output_location,
                     file_location=temp_file.name,
-                    aws_settings=self.aws_settings,
+                    bucket_settings=self.bucket_settings,
                 )
 
                 if not upload:

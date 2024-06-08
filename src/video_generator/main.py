@@ -32,7 +32,7 @@ from settings import (
     EmbeddingSettings,
     LLMSettings,
     HuggingFaceHubSettings,
-    AWSSettings,
+    BucketSettings,
 )
 
 from utils import MediaFile, Story, WikiPage, SupportedMediaFileType, upload_file_to_s3
@@ -59,7 +59,7 @@ redis_settings = RedisSettings()
 embeddings_settings = EmbeddingSettings()
 llm_settings = LLMSettings()
 hf_hub_settings = HuggingFaceHubSettings()
-# aws_settings = AWSSettings()
+# bucket_settings = AWSSettings()
 
 WIKI_API_SEARCH_URL = "https://en.wikipedia.org/w/rest.php/v1/search/page?q={}&limit=4"
 redis_url = f"redis://{redis_settings.redis_host}:{redis_settings.redis_port}"
@@ -69,20 +69,20 @@ ner_model = InferenceClient(token=hf_hub_settings.HuggingFacehub_api_token)
 
 # aws_s3_client = boto3.client(
 #     "s3",
-#     aws_access_key_id=aws_settings.aws_access_key,
-#     aws_secret_access_key=aws_settings.aws_secret_key,
+#     aws_access_key_id=bucket_settings.aws_access_key,
+#     aws_secret_access_key=bucket_settings.aws_secret_key,
 # )
 
 # aws_polly_client = boto3.client(
 #     "polly",
-#     aws_access_key_id=aws_settings.aws_access_key,
-#     aws_secret_access_key=aws_settings.aws_secret_key,
+#     aws_access_key_id=bucket_settings.aws_access_key,
+#     aws_secret_access_key=bucket_settings.aws_secret_key,
 #     region_name="us-west-2",
 # )
 # aws_transcribe_client = boto3.client(
 #     "transcribe",
-#     aws_access_key_id=aws_settings.aws_access_key,
-#     aws_secret_access_key=aws_settings.aws_secret_key,
+#     aws_access_key_id=bucket_settings.aws_access_key,
+#     aws_secret_access_key=bucket_settings.aws_secret_key,
 #     region_name="us-east-1",
 # )
 
@@ -179,8 +179,8 @@ def combine_video_and_audio(
         video=input_videos,
         audio=input_audio,
         output_location=output_file,
-        aws_client=aws_s3_client,
-        aws_settings=aws_settings,
+        s3_client=aws_s3_client,
+        bucket_settings=bucket_settings,
     )
 
     process = process.concatinate_video().trim_video().execute()
@@ -220,7 +220,7 @@ def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
             client,
             media_file=media_file,
             file_location=tempfile.name,
-            aws_settings=aws_settings,
+            bucket_settings=bucket_settings,
         )
         if not upload:
             logger.warning("Failed to upload audio to S3")
@@ -232,7 +232,7 @@ def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
 def transcribe_audio(client, *, audio: MediaFile):
     client.start_transcription_job(
         TranscriptionJobName=audio.name,
-        Media={"MediaFileUri": audio.get_s3_location(settings=aws_settings)},
+        Media={"MediaFileUri": audio.get_s3_location(settings=bucket_settings)},
         MediaFormat="wav",
         LanguageCode="en-US",
     )
@@ -581,4 +581,17 @@ def main():
 
 
 if __name__ == "__main__":
-    # main()s
+    # main()
+    from ibm_botocore.client import Config, ClientError
+
+    ibm_cloud_writer_client = ibm_boto3.resource(
+        service_name="s3",
+        ibm_api_key_id="kKa3P-xl9gjjECYCAF0872FnvW03wIiH9fN7htuybP4o",
+        # ibm_service_instance_id="crn:v1:bluemix:public:cloud-object-storage:global:a/0558f2d90ab4478793533d5202ce1691:acd3ab04-4d7c-4916-8937-6aeef9765913:bucket:shortsai",
+        config=Config(signature_version="oauth"),
+        endpoint_url="https://s3.us-south.cloud-object-storage.appdomain.cloud",
+    )
+    # print(ibm_cloud_writer_client)
+    # # bucket = ibm_cloud_writer_client.Bucket("shortsai")
+    # print(bucket.Object("hello.txt").get())
+    # s3.Object('mybucket', 'hello.txt').download_file('/tmp/hello.txt')
