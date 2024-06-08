@@ -2,7 +2,11 @@ import requests
 from enum import StrEnum
 from pydantic import BaseModel, AnyUrl, Field
 
-from video_generator.exceptions.promptexceptions import ServerTimeOutError
+from video_generator.exceptions.sessionExceptions import (
+    ServerTimeOutError,
+    ResourceNotFoundError,
+)
+
 
 class RequestMethods(StrEnum):
     GET = "GET"
@@ -11,6 +15,7 @@ class RequestMethods(StrEnum):
     PATCH = "PATCH"
     DELETE = "DELETE"
     HEAD = "HEAD"
+
 
 def create_session() -> requests.Session:
     """
@@ -26,7 +31,9 @@ class SessionManager(BaseModel):
     url: AnyUrl
     session: requests.Session = Field(default_factory=create_session)
 
-    def send_requst(self, request_method: RequestMethods=RequestMethods.DELETE) -> int:
+    def send_requst(
+        self, request_method: RequestMethods = RequestMethods.DELETE
+    ) -> requests.Response:
         """
         Sends a request to the specified URL using the provided request method.
 
@@ -49,11 +56,11 @@ class SessionManager(BaseModel):
             raise ServerTimeOutError(location=self.url) from e
 
         return responce
-    
+
 
 class Session(SessionManager):
 
-    def is_valid_url(self):
+    def check_url(self) -> int:
         """
         Sends a HEAD request to the specified URL to check if it is valid.
 
@@ -63,4 +70,23 @@ class Session(SessionManager):
         Raises:
             ServerTimeOutError: If the request times out.
         """
-        return self.send_requst(request_method=RequestMethods.HEAD)
+        return self.send_requst(request_method=RequestMethods.HEAD).status_code
+
+    def return_contents(self) -> str:
+        """
+        Sends a GET request to the specified URL and returns the response content.
+
+        Returns:
+            str: The response content.
+
+        Raises:
+            ServerTimeOutError: If the request times out.
+        """
+        response = self.send_requst(request_method=RequestMethods.GET)
+
+        if response.status_code == 404:
+            raise ResourceNotFoundError(location=self.url)
+        if response.status_code not in (200, 404):
+            raise ServerTimeOutError(location=self.url)
+
+        return response.text

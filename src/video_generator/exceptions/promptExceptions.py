@@ -23,13 +23,3 @@ class InvalidLocationError(BasePromptException):
         message = f"{self.location} is not a valid url/path"
         super().__init__(message)
 
-class ServerTimeOutError(BasePromptException):
-    def __init__(self, location) -> None:
-        """
-        Initialize ServerTimeOutError with the provided location.
-        
-        Args:
-            location (str): The location of the server.
-        """
-        self.message = f"server at {location} did not respond"
-        super().__init__(self.message)
