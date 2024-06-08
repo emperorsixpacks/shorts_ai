@@ -1,5 +1,5 @@
 import os
-from exceptions import InvalidLocationError, ServerTimeOutError
+from video_generator.exceptions.promptexceptions import InvalidLocationError, ServerTimeOutError
 
 
 
