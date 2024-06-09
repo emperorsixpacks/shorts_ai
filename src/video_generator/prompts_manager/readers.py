@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from video_generator.exceptions.sessionExceptions import ServerTimeOutError
 from video_generator.exceptions.promptExceptions import  UnsupportedFileFormat
 
-
 @dataclass
 class BaseReader:
 
@@ -44,6 +43,16 @@ class BaseReader:
         except TimeoutError as e:
             raise ServerTimeOutError(location=self.file_path) from e
         return responce
+    
+    def _open_file(self, mode):
+        try:
+            with open(self.file_path, mode.lower(), encoding="utf-8") as f:
+                return f
+        except FileNotFoundError as e:
+            raise FileNotFoundError(f"File not found: {self.file_path}") from e
+        finally:
+            f.close()
+
 
 class TextReader(BaseReader):
      
@@ -64,7 +73,16 @@ class TextReader(BaseReader):
         return self._read_from_url(session=session)
 
     def read_from_path(self):
-        with open(self.file_path, "r", encoding="utf-8") as f:
-            self.contents = f.read()
+        """
+        Reads the contents of a file located at `self.file_path` and returns it.
+
+        Returns:
+            str: The contents of the file.
+
+        Raises:
+            FileNotFoundError: If the file at `self.file_path` does not exist.
+            PermissionError: If the file at `self.file_path` cannot be read.
+        """
+        return self._open_file(mode="r").read()
 
 
