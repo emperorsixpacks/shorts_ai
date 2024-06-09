@@ -5,6 +5,7 @@ from pydantic import BaseModel, AnyUrl, Field
 from video_generator.exceptions.sessionExceptions import (
     ServerTimeOutError,
     ResourceNotFoundError,
+    ServerError
 )
 
 
@@ -56,11 +57,25 @@ class SessionManager(BaseModel):
             raise ServerTimeOutError(location=self.url) from e
 
         return responce
+    
+    def close(self):
+        """
+        Closes the session by calling the `close()` method of the `session` object.
+
+        This method is used to release any resources that the session may be holding. It is typically called when the session is no longer needed or when the program is exiting.
+
+        Parameters:
+            self (Session): The current instance of the `Session` class.
+
+        Returns:
+            None
+        """
+        self.session.close()
 
 
 class Session(SessionManager):
 
-    def check_url(self) -> int:
+    def ping(self) -> int:
         """
         Sends a HEAD request to the specified URL to check if it is valid.
 
@@ -87,6 +102,6 @@ class Session(SessionManager):
         if response.status_code == 404:
             raise ResourceNotFoundError(location=self.url)
         if response.status_code not in (200, 404):
-            raise ServerTimeOutError(location=self.url)
+            raise ServerError(location=self.location, status_code=response.status_code)
 
         return response.text

@@ -1,8 +1,6 @@
 import os
-from video_generator.exceptions.promptExceptions import (
-    InvalidLocationError,
-    ServerTimeOutError,
-)
+from video_generator.exceptions.promptExceptions import InvalidLocationError
+from video_generator.exceptions.sessionExceptions import ServerTimeOutError
 from video_generator.session_manager import Session
 
 
@@ -61,8 +59,8 @@ class PromptsBase:
             None
         """
         if self.path_is_url(location):
-            self.session = Session(location)
-            if self.session.is_valid_url(location) != 200:
+            self.session = Session(location=location)
+            if self.session.ping() != 200:
                 raise InvalidLocationError(location=location)
 
         if not self.check_path(location):
