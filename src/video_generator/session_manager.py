@@ -1,5 +1,6 @@
 import requests
 from enum import StrEnum
+from typing import TypeVar
 from pydantic import BaseModel, AnyUrl, Field
 
 from video_generator.exceptions.sessionExceptions import (
@@ -7,6 +8,9 @@ from video_generator.exceptions.sessionExceptions import (
     ResourceNotFoundError,
     ServerError
 )
+
+RequestSession = TypeVar("RequestSession", "requests.Session", None)
+
 
 
 class RequestMethods(StrEnum):
@@ -30,7 +34,7 @@ def create_session() -> requests.Session:
 
 class SessionManager(BaseModel):
     url: AnyUrl
-    session: requests.Session = Field(default_factory=create_session)
+    session: RequestSession = Field(default_factory=create_session)
 
     def send_requst(
         self, request_method: RequestMethods = RequestMethods.DELETE
