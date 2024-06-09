@@ -72,7 +72,7 @@ class Session(SessionManager):
         """
         return self.send_requst(request_method=RequestMethods.HEAD).status_code
 
-    def get_contents(self) -> str:
+    def get_content(self) -> str:
         """
         Sends a GET request to the specified URL and returns the response content.
 

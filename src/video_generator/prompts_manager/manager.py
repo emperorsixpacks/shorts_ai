@@ -72,7 +72,7 @@ class PromptsBase:
 
     def _read_from_url(self):
         try:
-            responce = self.session.re
+            responce = self.session.get_content()
         except TimeoutError as e:
             raise ServerTimeOutError(location=self.location) from e
         else:
