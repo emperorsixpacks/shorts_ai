@@ -30,6 +30,7 @@ class PromptManager:
         self.location = location
         self.contents: str = None
         self.session: Session = Session(location=self.location)
+        self.file_reader: FileReader = None
 
     @staticmethod
     def check_path(path: str) -> bool:
@@ -88,7 +89,7 @@ class PromptManager:
 
         self._location = location
 
-    def read_prompt(self, reader:FileReader) -> Self:
+    def read_prompt(self) -> Self:
         """
         Reads a prompt from a file or URL and sets the contents of the prompt.
 
@@ -102,12 +103,14 @@ class PromptManager:
             UnsupportedFileFormat: If the file type is not supported.
 
         """
-        if reader.file_type not in SupportedFileTypes:
-            raise UnsupportedFileFormat(file=reader.file_type, supported_format=SupportedFileTypes)
-        if self.path_is_url(self.location):
-            self.contents = reader.read_from_url(session=self.session)
+        if self.file_reader is None:
+                raise Exception
+        if not self.path_is_url(self.location):    
+            if self.file_reader.file_type not in SupportedFileTypes:
+                raise UnsupportedFileFormat(file=self.file_reader.file_type, supported_format=SupportedFileTypes)
+            self.contents = self.file_reader.read_from_path(session=self.session)
         else:
-           self.contents = reader.read_from_path()
+           self.contents = self.file_reader.read_from_path()
 
         return self
 
