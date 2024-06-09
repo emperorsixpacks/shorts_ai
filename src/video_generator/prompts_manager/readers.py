@@ -1,6 +1,9 @@
 import re
 from dataclasses import dataclass, field
 
+from video_generator.exceptions.sessionExceptions import ServerTimeOutError
+from video_generator.exceptions.promptExceptions import  UnsupportedFileFormat
+
 
 @dataclass
 class BaseReader:
@@ -34,19 +37,34 @@ class BaseReader:
         file_name = match.group(1)
         file_extension = match.group(2)
         return file_name, file_extension
+    
+    def _read_from_url(self, session):
+        try:
+            responce = session.get_content()
+        except TimeoutError as e:
+            raise ServerTimeOutError(location=self.file_path) from e
+        return responce
 
+class TextReader(BaseReader):
+     
+    def __post_init__(self):
+        if self.file_type != "txt":
+            raise UnsupportedFileFormat(file=self.file_type, supported_format="txt")
+        
+    def read_from_url(self, session):
+        """
+        Reads the content from a URL using the session object.
 
-# class TextReader(PromptsBase):
-#      def read_from_url(self):
-#         try:
-#             responce = self.session.get_content()
-#         except TimeoutError as e:
-#             raise ServerTimeOutError(location=self.location) from e
-#         else:
-#             self.contents = responce.text
+        Returns:
+            str: The content of the URL.
 
-#     def read_from_path(self):
-#         with open(self.location, "r", encoding="utf-8") as f:
-#             self.contents = f.read()
+        Raises:
+            ServerTimeOutError: If the server at the specified location does not respond within the timeout period.
+        """
+        return self._read_from_url(session=session)
+
+    def read_from_path(self):
+        with open(self.file_path, "r", encoding="utf-8") as f:
+            self.contents = f.read()
 
 

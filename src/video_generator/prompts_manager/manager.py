@@ -5,7 +5,6 @@ from video_generator.prompts_manager.protocols import FileReader
 
 from video_generator.session_manager import Session
 from video_generator.exceptions.promptExceptions import InvalidLocationError, UnsupportedFileFormat
-from video_generator.exceptions.sessionExceptions import ServerTimeOutError
 
 class SupportedFileTypes(StrEnum):
     TXT = "txt"
