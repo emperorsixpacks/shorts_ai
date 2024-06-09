@@ -29,7 +29,7 @@ class PromptManager:
     def __init__(self, location) -> None:
         self.location = location
         self.contents: str = None
-        self.session: Session = None
+        self.session: Session = Session(location=self.location)
 
     @staticmethod
     def check_path(path: str) -> bool:
@@ -80,7 +80,6 @@ class PromptManager:
             None
         """
         if self.path_is_url(location):
-            self.session = Session(location=location)
             if self.session.ping() != 200:
                 raise InvalidLocationError(location=location)
 
@@ -126,3 +125,6 @@ def get_prompt_manager(file_reader: FileReader) -> Self:
         PromptManager: A PromptManager instance.
     """
     return PromptManager(location=file_reader.file_path)
+
+
+# TODO write tests
