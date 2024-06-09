@@ -1,6 +1,7 @@
 import os
 from enum import StrEnum
 from typing import Self
+from dataclasses import dataclass
 from video_generator.prompts_manager.protocols import FileReader
 
 from video_generator.session_manager import Session
@@ -9,7 +10,7 @@ from video_generator.exceptions.promptExceptions import InvalidLocationError, Un
 class SupportedFileTypes(StrEnum):
     TXT = "txt"
 
-class PromptsBase:
+class Prompt:
     def __init__(self, location) -> None:
         self.location = location
         self.contents: str = None
@@ -98,3 +99,5 @@ class PromptsBase:
 
     def __del__(self):
         self.session.close()
+
+
