@@ -6,11 +6,10 @@ from pydantic import BaseModel, AnyUrl, Field
 from video_generator.exceptions.sessionExceptions import (
     ServerTimeOutError,
     ResourceNotFoundError,
-    ServerError
+    ServerError,
 )
 
 RequestSession = TypeVar("RequestSession", "requests.Session", None)
-
 
 
 class RequestMethods(StrEnum):
@@ -61,7 +60,7 @@ class SessionManager(BaseModel):
             raise ServerTimeOutError(location=self.url) from e
 
         return responce
-    
+
     def close(self):
         """
         Closes the session by calling the `close()` method of the `session` object.

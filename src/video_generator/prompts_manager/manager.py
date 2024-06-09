@@ -1,8 +1,14 @@
 import os
-from video_generator.exceptions.promptExceptions import InvalidLocationError
-from video_generator.exceptions.sessionExceptions import ServerTimeOutError
-from video_generator.session_manager import Session
+from enum import StrEnum
+from typing import Self
+from video_generator.prompts_manager.protocols import FileReader
 
+from video_generator.session_manager import Session
+from video_generator.exceptions.promptExceptions import InvalidLocationError, UnsupportedFileFormat
+from video_generator.exceptions.sessionExceptions import ServerTimeOutError
+
+class SupportedFileTypes(StrEnum):
+    TXT = "txt"
 
 class PromptsBase:
     def __init__(self, location) -> None:
@@ -68,22 +74,28 @@ class PromptsBase:
 
         self._location = location
 
-    def _read_from_url(self):
-        try:
-            responce = self.session.get_content()
-        except TimeoutError as e:
-            raise ServerTimeOutError(location=self.location) from e
-        else:
-            self.contents = responce.text
+    def read_prompt(self, reader:FileReader) -> Self:
+        """
+        Reads a prompt from a file or URL and sets the contents of the prompt.
 
-    def _read_from_path(self):
-        pass
+        Parameters:
+            reader (FileReader): The FileReader instance used to read the prompt.
 
-    def read_prompt(self):
+        Returns:
+            Self: The current instance of the class.
+
+        Raises:
+            UnsupportedFileFormat: If the file type is not supported.
+
+        """
+        if reader.file_type not in SupportedFileTypes:
+            raise UnsupportedFileFormat(file=reader.file_type, supported_format=SupportedFileTypes)
         if self.path_is_url(self.location):
-            self._read_from_url()
+            self.contents = reader.read_from_url(session=self.session)
         else:
-            self._read_from_path()
+           self.contents = reader.read_from_path()
+
+        return self
 
     def __del__(self):
         self.session.close()
