@@ -1,7 +1,22 @@
+"""
+This module provides functionality for managing prompts in the video generation pipeline.
+
+It includes classes and functions for reading prompts from files, checking the validity of file locations,
+and handling exceptions related to prompts.
+
+Classes:
+    SupportedFileTypes: An enumeration of supported file types for prompts.
+    PromptManager: A class for managing prompts, including reading prompts from files and checking file locations.
+
+Functions:
+    get_prompt_manager: A factory function for creating a PromptManager instance.
+"""
+
+
 import os
 from enum import StrEnum
 from typing import Self
-from dataclasses import dataclass
+
 from video_generator.prompts_manager.protocols import FileReader
 
 from video_generator.session_manager import Session
@@ -10,7 +25,7 @@ from video_generator.exceptions.promptExceptions import InvalidLocationError, Un
 class SupportedFileTypes(StrEnum):
     TXT = "txt"
 
-class Prompt:
+class PromptManager:
     def __init__(self, location) -> None:
         self.location = location
         self.contents: str = None
@@ -100,4 +115,14 @@ class Prompt:
     def __del__(self):
         self.session.close()
 
+def get_prompt_manager(file_reader: FileReader) -> Self:
+    """
+    Factory function for creating a PromptManager instance.
 
+    Args:
+        file_reader (FileReader): An instance of a class implementing the FileReader protocol.
+
+    Returns:
+        PromptManager: A PromptManager instance.
+    """
+    return PromptManager(location=file_reader.file_path)

@@ -1,6 +1,13 @@
-import requests
+"""
+This module provides functionality for managing sessions.
+
+It includes classes and functions for sending requests, closing sessions, and handling exceptions.
+
+"""
 from enum import StrEnum
 from typing import TypeVar
+
+import requests
 from pydantic import BaseModel, AnyUrl, Field
 
 from video_generator.exceptions.sessionExceptions import (
