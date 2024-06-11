@@ -1,8 +1,9 @@
 import re
 from dataclasses import dataclass, field
 
+from video_generator.session_manager import Session
 from video_generator.exceptions.sessionExceptions import ServerTimeOutError
-from video_generator.exceptions.promptExceptions import  UnsupportedFileFormat
+from video_generator.exceptions.promptExceptions import  UnsupportedFileFormatError
 
 @dataclass
 class BaseReader:
@@ -13,6 +14,67 @@ class BaseReader:
 
     def __post_init__(self):
         self.file_name, self.file_type = self.return_name_and_type()
+        if self.path_is_url(self.file_path):
+            self.session: Session = Session(location=self.file_path)
+    
+    
+    @staticmethod
+    def check_path(path: str) -> bool:
+        """
+        A method to check if the specified path exists.
+
+        Parameters:
+            path (str): The path to check.
+
+        Returns:
+            bool: True if the path exists, False otherwise.
+        """
+        return os.path.exists(path)
+
+    @staticmethod
+    def path_is_url(url) -> bool:
+        """
+        A static method to check if a given path is a URL.
+
+        Parameters:
+            url (str): The path to check.
+
+        Returns:
+            bool: True if the path is a URL, False otherwise.
+        """
+        if url.startswith(("https://", "http://", "www.")):
+            return True
+        return False
+
+    @property
+    def location(self):
+        """
+        Getter method for the 'location' property.
+        Returns the value of the '_location' attribute.
+        """
+        return self._location
+
+    @location.setter
+    def set_location(self, location: str):
+        """
+        Sets the location of the prompt. Validates the location based on URL or path.
+        Raises InvalidLocationError if the location is invalid.
+
+        Parameters:
+            location (str): The location to be set for the prompt.
+
+        Returns:
+            None
+        """
+        if self.path_is_url(location):
+            if self.session.ping() != 200:
+                raise InvalidLocationError(location=location)
+
+        if not self.check_path(location):
+            raise InvalidLocationError(location=location)
+
+        self._location = location
+
 
     def return_name_and_type(self):
         """
@@ -58,7 +120,7 @@ class TextReader(BaseReader):
      
     def __post_init__(self):
         if self.file_type != "txt":
-            raise UnsupportedFileFormat(file=self.file_type, supported_format="txt")
+            raise UnsupportedFileFormatError(file=self.file_type, supported_format="txt")
         
     def read_from_url(self, session):
         """
