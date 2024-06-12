@@ -5,10 +5,10 @@ It includes classes and functions for sending requests, closing sessions, and ha
 
 """
 from enum import StrEnum
-from typing import TypeVar
+from typing import TypeVar, Self
 
 import requests
-from pydantic import BaseModel, AnyUrl, Field
+from pydantic import BaseModel, AnyUrl, Field, model_validator
 
 from video_generator.exceptions.sessionExceptions import (
     ServerTimeOutError,
@@ -115,3 +115,5 @@ class Session(SessionManager):
             raise ServerError(location=self.location, status_code=response.status_code)
 
         return response.text
+
+# TODO write tests
