@@ -24,14 +24,14 @@ class InvalidLocationError(BasePromptException):
         super().__init__(message)
 
 
-class UnsupportedFileFormat(BasePromptException):
+class UnsupportedFileFormatError(BasePromptException):
     """
     This class represents an error for an unsupported file format.
     """
 
     def __init__(self, file:str=None, supported_format: str = None) -> None:
         """
-        Initialize UnsupportedFileFormat with the provided file format.
+        Initialize UnsupportedFileFormatError with the provided file format.
         
         Args:
             file (str): The unsupported file format.
