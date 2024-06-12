@@ -25,6 +25,8 @@ class BaseReader:
     file_path: str
     file_name: str = field(init=False)
     file_type: str = field(init=False)
+    session: Session = field(init=False, default=None)
+    _type: ReaderType = field(init=False, default=None)
 
     def __post_init__(self):
         self.file_path = self.set_file_path()
@@ -120,6 +122,10 @@ class BaseReader:
             raise FileNotFoundError(f"File not found: {self.file_path}") from e
         finally:
             f.close()
+        
+    def __del__(self):
+        if self.session is not None:
+            self.session.close()
 
 
 class TextReader(BaseReader):
