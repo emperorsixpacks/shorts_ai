@@ -15,10 +15,16 @@ class ReaderType(StrEnum):
     URL = "URL"
     FILE = "FILE"
 
+
+@dataclass
 class BaseReader:
 
-    def __init__(self, file_path: str):
-        self.file_path: str = file_path
+    file_path: str
+    file_name: str = field(init=False)
+    file_type: str = field(init=False)
+
+    def __post_init__(self):
+        self.file_path = self.set_file_path()
         self.file_name, self.file_type = self.return_name_and_type()
         if self.path_is_url(self.file_path):
             self._type = ReaderType.URL
@@ -53,34 +59,25 @@ class BaseReader:
             return True
         return False
 
-    @property
-    def location(self):
+    def set_file_path(self):
         """
-        Getter method for the 'location' property.
-        Returns the value of the '_location' attribute.
-        """
-        return self._location
-
-    @location.setter
-    def set_location(self, location: str):
-        """
-        Sets the location of the prompt. Validates the location based on URL or path.
-        Raises InvalidLocationError if the location is invalid.
+        Sets the file_path of the prompt. Validates the file_path based on URL or path.
+        Raises InvalidLocationError if the file_path is invalid.
 
         Parameters:
-            location (str): The location to be set for the prompt.
+            file_path (str): The file_path to be set for the prompt.
 
         Returns:
             None
         """
-        if self.path_is_url(location):
+        if self.path_is_url(self.file_path):
             if self.session.ping() != 200:
-                raise InvalidLocationError(location=location)
+                raise InvalidLocationError(location=self.file_path)
 
-        if not self.check_path(location):
-            raise InvalidLocationError(location=location)
+        if not self.check_path(self.file_path):
+            raise InvalidLocationError(location=self.file_path)
 
-        self._location = location
+        return self.file_path
 
     def return_name_and_type(self):
         """
@@ -131,6 +128,15 @@ class TextReader(BaseReader):
             )
 
     def read(self):
+        """
+        Reads the contents of a file or URL based on the type specified in the instance variable `_type`.
+
+        Returns:
+            The contents of the file or URL as a string.
+
+        Raises:
+            KeyError: If the `_type` is not recognized.
+        """
         reader = {ReaderType.URL: self._read_from_url, ReaderType.FILE: self._open_file}
 
         return reader.get(self._type)()
