@@ -1,23 +1,30 @@
+import os
 import re
+from enum import StrEnum
 from dataclasses import dataclass, field
 
 from video_generator.session_manager import Session
 from video_generator.exceptions.sessionExceptions import ServerTimeOutError
-from video_generator.exceptions.promptExceptions import  UnsupportedFileFormatError
+from video_generator.exceptions.promptExceptions import (
+    UnsupportedFileFormatError,
+    InvalidLocationError,
+)
 
-@dataclass
+
+class ReaderType(StrEnum):
+    URL = "URL"
+    FILE = "FILE"
+
 class BaseReader:
 
-    file_path: str
-    file_name: str = field(init=False)
-    file_type: str = field(init=False)
-
-    def __post_init__(self):
+    def __init__(self, file_path: str):
+        self.file_path: str = file_path
         self.file_name, self.file_type = self.return_name_and_type()
         if self.path_is_url(self.file_path):
+            self._type = ReaderType.URL
             self.session: Session = Session(location=self.file_path)
-    
-    
+        self._type = ReaderType.FILE
+
     @staticmethod
     def check_path(path: str) -> bool:
         """
@@ -75,7 +82,6 @@ class BaseReader:
 
         self._location = location
 
-
     def return_name_and_type(self):
         """
         Returns the name and type of a file based on its file path.
@@ -98,17 +104,17 @@ class BaseReader:
         file_name = match.group(1)
         file_extension = match.group(2)
         return file_name, file_extension
-    
-    def _read_from_url(self, session):
+
+    def _read_from_url(self):
         try:
-            responce = session.get_content()
+            responce = self.session.get_content()
         except TimeoutError as e:
             raise ServerTimeOutError(location=self.file_path) from e
         return responce
-    
-    def _open_file(self, mode):
+
+    def _open_file(self):
         try:
-            with open(self.file_path, mode.lower(), encoding="utf-8") as f:
+            with open(self.file_path, "r", encoding="utf-8") as f:
                 return f
         except FileNotFoundError as e:
             raise FileNotFoundError(f"File not found: {self.file_path}") from e
@@ -117,34 +123,14 @@ class BaseReader:
 
 
 class TextReader(BaseReader):
-     
+
     def __post_init__(self):
         if self.file_type != "txt":
-            raise UnsupportedFileFormatError(file=self.file_type, supported_format="txt")
-        
-    def read_from_url(self, session):
-        """
-        Reads the content from a URL using the session object.
+            raise UnsupportedFileFormatError(
+                file=self.file_type, supported_format="txt"
+            )
 
-        Returns:
-            str: The content of the URL.
+    def read(self):
+        reader = {ReaderType.URL: self._read_from_url, ReaderType.FILE: self._open_file}
 
-        Raises:
-            ServerTimeOutError: If the server at the specified location does not respond within the timeout period.
-        """
-        return self._read_from_url(session=session)
-
-    def read_from_path(self):
-        """
-        Reads the contents of a file located at `self.file_path` and returns it.
-
-        Returns:
-            str: The contents of the file.
-
-        Raises:
-            FileNotFoundError: If the file at `self.file_path` does not exist.
-            PermissionError: If the file at `self.file_path` cannot be read.
-        """
-        return self._open_file(mode="r").read()
-
-
+        return reader.get(self._type)()
