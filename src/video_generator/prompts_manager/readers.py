@@ -18,6 +18,9 @@ class ReaderType(StrEnum):
 
 @dataclass
 class BaseReader:
+    """
+    Base class for readers.
+    """
 
     file_path: str
     file_name: str = field(init=False)
@@ -120,6 +123,14 @@ class BaseReader:
 
 
 class TextReader(BaseReader):
+    """Class for reading txt file types
+
+    Args:
+        file_path (str): The path to the file.
+    
+    Raises:
+        UnsupportedFileFormatError: If file_type is not txt.
+    """
 
     def __post_init__(self):
         if self.file_type != "txt":
