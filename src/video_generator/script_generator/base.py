@@ -6,7 +6,7 @@ from langchain.schema import Document
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from video_generator.settings import LLMSettings
-from video_generator.prompts_manager.manager import PromptManager
+from video_generator.prompts_manager import get_prompt_manager, TextReader
 
 def extract_answer(llm_output):
     """
@@ -40,7 +40,13 @@ class LLm:
         if use_same:
             self.validation_model = self.gen_model
 
-    def validate(self, documents:List[Document], prompt:str, system_message:str, use_chat_model: bool= True) -> bool:
+    def validate(
+        self,
+        documents: List[Document],
+        prompt: str,
+        system_message: str,
+        use_chat_model: bool = True,
+    ) -> bool:
         if use_chat_model:
             messages = [
                 SystemMessage(content=system_message),
@@ -48,8 +54,10 @@ class LLm:
             ]
             result = extract_answer(self.validation_model.invoke(messages).content)
         else:
-            result = extract_answer(self.validation_model.invoke({"user": prompt, "documents": documents}))
-        
+            result = extract_answer(
+                self.validation_model.invoke({"user": prompt, "documents": documents})
+            )
+
         if not result:
             return False
         return True
@@ -58,12 +66,10 @@ class LLm:
         pass
 
 
-
-
 def validate_user_prompt(
     text: str,
     valid_documents: List[Document],
-    model: ChatModel,
+    model: LLm,
     message: List[str] | str,
 ) -> bool:
     """
@@ -77,11 +83,13 @@ def validate_user_prompt(
     - str: The question generated based on the user prompt and documents.
     """
     logger.info("Checking user prompt against documents")
-    llm_output = model.invoke(message).content
-    return extract_answer(llm_output=llm_output)
+    text_reader = TextReader(
+        file_path="<PUT FILE PATH HERE>"
+    )
+    return model.validate(documents=valid_documents, prompt=text, system_message=text_reader.read())
 
 
-class StoryModel(BaseModel):
+class ScriptBase(BaseModel):
 
     prompt: str
     documents: List[Document]
