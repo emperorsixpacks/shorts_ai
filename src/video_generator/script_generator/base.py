@@ -8,6 +8,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from video_generator.settings import LLMSettings
 from video_generator.prompts_manager import get_prompt_manager, TextReader
 
+
 def extract_answer(llm_output):
     """
     A function that extracts an answer from the given LLM output. It searches for a pattern that matches '**True**\n\nThe'
@@ -62,8 +63,8 @@ class LLm:
             return False
         return True
 
-    def generate(self):
-        pass
+    def generate(self, prompt: str, documents: List[Document]):
+        return self.gen_model.invoke({"user": prompt, "documents": documents})
 
 
 def validate_user_prompt(
@@ -82,10 +83,10 @@ def validate_user_prompt(
     - str: The question generated based on the user prompt and documents.
     """
     logger.info("Checking user prompt against documents")
-    text_reader = TextReader(
-        file_path="<PUT FILE PATH HERE>"
+    text_reader = TextReader(file_path="<PUT FILE PATH HERE>")
+    return model.validate(
+        documents=valid_documents, prompt=text, system_message=text_reader.read()
     )
-    return model.validate(documents=valid_documents, prompt=text, system_message=text_reader.read())
 
 
 class ScriptBase(BaseModel):
@@ -109,14 +110,14 @@ class ScriptBase(BaseModel):
         - str: The question generated based on the user prompt and documents.
         """
         logger.info("Checking user prompt against documents")
-        text_reader = TextReader(
-            file_path="<PUT FILE PATH HERE>"
+        text_reader = TextReader(file_path="<PUT FILE PATH HERE>")
+        return self.model.validate(
+            documents=self.ocuments,
+            prompt=self.prompt,
+            system_message=text_reader.read(),
         )
-        return self.model.validate(documents=self.ocuments, prompt=self.prompt, system_message=text_reader.read())
 
-    def generate_story(
-        self, user_prompt: str, context_documents: List[Document]
-    ) -> Story:
+    def generate_story(self):
         """
         Generates a story based on the user prompt and context documents.
 
@@ -128,25 +129,5 @@ class ScriptBase(BaseModel):
             str: The generated story.
         """
         logger.info("Generating story")
-        presence_penalty = AI21PenaltyData(scale=4.9)
-        frequency_penalty = AI21PenaltyData(scale=4)
-        llm = AI21(
-            model="j2-mid",
-            ai21_api_key=llm_settings.ai21_api_key,
-            maxTokens=120,
-            presencePenalty=presence_penalty,
-            minTokens=80,
-            frequencyPenalty=frequency_penalty,
-            temperature=0.5,
-            topP=0.2,
-        )
 
-        prompt_template = open_prompt_txt("../prompts/prompt.txt")
-        final_prompt = PromptTemplate(
-            input_variables=["documents", "user"],
-            template=prompt_template,
-        )
-        chain = LLMChain(llm=llm, prompt=final_prompt)
-        question = chain.invoke({"user": user_prompt, "documents": context_documents})
-        logger.info("Story generated successfully")
-        return Story(prompt=user_prompt, text=question["text"])
+        return self.model.generate(prompt=self.prompt, documents=self.documents)
