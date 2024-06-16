@@ -1,7 +1,7 @@
 from typing import List, Protocol
 
 from langchain.cache import RedisCache
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 from langchain.schema import Document
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -70,7 +70,6 @@ def validate_user_prompt(
     text: str,
     valid_documents: List[Document],
     model: LLm,
-    message: List[str] | str,
 ) -> bool:
     """
     A function that checks a user prompt against a list of documents and returns a question generated based on the prompt and documents.
@@ -97,9 +96,8 @@ class ScriptBase(BaseModel):
     indexs: List[str]
     model: LLm
 
-    @classmethod
-    @field_validator(mode="after")
-    def validate_user_prompt(cls, value):
+    @model_validator(mode="after")
+    def validate_user_prompt(self):
         """
         A function that checks a user prompt against a list of documents and returns a question generated based on the prompt and documents.
 
@@ -111,8 +109,10 @@ class ScriptBase(BaseModel):
         - str: The question generated based on the user prompt and documents.
         """
         logger.info("Checking user prompt against documents")
-        llm_output = model.invoke(message).content
-        return extract_answer(llm_output=llm_output)
+        text_reader = TextReader(
+            file_path="<PUT FILE PATH HERE>"
+        )
+        return self.model.validate(documents=self.ocuments, prompt=self.prompt, system_message=text_reader.read())
 
     def generate_story(
         self, user_prompt: str, context_documents: List[Document]
