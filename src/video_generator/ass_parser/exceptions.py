@@ -6,7 +6,7 @@ class BaseFileException(Exception):
         super().__init__(self.message)
         
 
-class UnsupportedFileFormat(BaseFileException):
+class UnsupportedFileFormatError(BaseFileException):
     
     def __init__(self, file:str=None):
         message =  f"Expected file of type .ass, got {file}"

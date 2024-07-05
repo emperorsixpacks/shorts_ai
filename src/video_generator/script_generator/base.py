@@ -1,7 +1,7 @@
+import re
 from typing import List, Protocol
 
-from langchain.cache import RedisCache
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, model_validator
 from langchain.schema import Document
 from langchain_core.messages import HumanMessage, SystemMessage
 

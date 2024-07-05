@@ -122,7 +122,7 @@ class BaseReader:
             raise FileNotFoundError(f"File not found: {self.file_path}") from e
         finally:
             f.close()
-        
+
     def __del__(self):
         if self.session is not None:
             self.session.close()
@@ -133,7 +133,7 @@ class TextReader(BaseReader):
 
     Args:
         file_path (str): The path to the file.
-    
+
     Raises:
         UnsupportedFileFormatError: If file_type is not txt.
     """
@@ -157,3 +157,7 @@ class TextReader(BaseReader):
         reader = {ReaderType.URL: self._read_from_url, ReaderType.FILE: self._open_file}
 
         return reader.get(self._type)()
+
+
+
+# TODO look into converting the read method into a class method

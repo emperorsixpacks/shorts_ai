@@ -29,6 +29,7 @@ pytest = "^8.2.1"
 num2words = "^0.5.13"
 ibm-cloud-sdk-core = "^3.20.0"
 ibm-cos-sdk = "^2.13.4"
+flask = "^3.0.3"
 
 
 

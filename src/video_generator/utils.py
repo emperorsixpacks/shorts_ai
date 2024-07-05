@@ -11,9 +11,10 @@ from datetime import datetime
 
 from ibm_botocore.exceptions import ClientError
 import ffmpeg
+from redis import Redis
 
 if TYPE_CHECKING:
-    from src.settings import BucketSettings
+    from video_generator.settings import BucketSettings
 
 
 class SupportedMediaFileType(StrEnum):
@@ -113,29 +114,6 @@ class AWSS3Method(StrEnum):
     GET = "get_object"
 
 
-@dataclass
-class Story:
-    """
-    Dataclass for storing metadata about a story.
-
-    Attributes:
-        prompt (str): The prompt for the story.
-        text (str): The story text.
-    """
-
-    prompt: str
-    text: str
-
-    @property
-    def length(self) -> int:
-        """
-        Returns the length of the story in words.
-
-        Returns:
-            int: The length of the story in words.
-        """
-        return len(self.text.split())
-
 
 @dataclass
 class WikiPage:
@@ -195,5 +173,17 @@ def upload_file_to_s3(
     print("Done uploading file to S3")
     return True
 
+
+
+def check_index_exists(client: Redis, index_name: str) -> bool:
+    """Check if Redis index exists."""
+    try:
+        client.ft(index_name).info()
+    except:  # noqa: E722
+        # logger.debug("Index does not exist")
+        print("Index does not exit")
+        return False
+    # logger.debug("Index already exmists")
+    return True
 
 # TODO add interface for both AWS and IBM Cloud

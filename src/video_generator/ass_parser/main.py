@@ -12,7 +12,7 @@ import num2words
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 import numpy as np
 
-from .exceptions import UnsupportedFileFormat
+from .exceptions import UnsupportedFileFormatError
 
 
 @dataclass
@@ -453,11 +453,11 @@ class PyAss:
             PyAss: The PyAss object.
 
         Raises:
-            UnsupportedFileFormat: If the file name does not have the ".ass" extension.
+            UnsupportedFileFormatError: If the file name does not have the ".ass" extension.
         """
         _, extention = os.path.splitext(self.file_name)
         if extention != ".ass":
-            raise UnsupportedFileFormat(file=self.file_name)
+            raise UnsupportedFileFormatError(file=self.file_name)
         self._io = open(self.file_name, mode="w+", encoding="utf-8")
         return self
 

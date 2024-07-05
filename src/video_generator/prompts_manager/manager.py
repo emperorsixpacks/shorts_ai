@@ -49,7 +49,7 @@ class PromptManager:
                 file=self.file_reader.file_type, supported_format=SupportedFileTypes
             )
         
-        self.contents = self.file_reader.read()
+        self.contents: str | None  = self.file_reader.read()
         return self
 
 
@@ -64,7 +64,7 @@ def get_prompt_manager(file_reader: FileReader) -> Self:
     Returns:
         PromptManager: A PromptManager instance.
     """
-    return PromptManager(location=file_reader.file_path)
+    return PromptManager(file_reader=file_reader.file_path)
 
 
 # TODO write tests
