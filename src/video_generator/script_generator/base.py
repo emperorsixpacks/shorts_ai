@@ -6,7 +6,7 @@ from langchain.schema import Document
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from video_generator.settings import LLMSettings
-from video_generator.prompts_manager import get_prompt_manager, TextReader
+from video_generator.prompts_manager import TextReader
 
 
 def extract_answer(llm_output):
@@ -83,7 +83,7 @@ def validate_user_prompt(
     - str: The question generated based on the user prompt and documents.
     """
     logger.info("Checking user prompt against documents")
-    text_reader = TextReader(file_path="<PUT FILE PATH HERE>")
+    text_reader = TextReader(file_path="validation_prompt.txt") # prompt name
     return model.validate(
         documents=valid_documents, prompt=text, system_message=text_reader.read()
     )
@@ -110,7 +110,7 @@ class ScriptBase(BaseModel):
         - str: The question generated based on the user prompt and documents.
         """
         logger.info("Checking user prompt against documents")
-        text_reader = TextReader(file_path="<PUT FILE PATH HERE>")
+        text_reader = TextReader(file_path="prompt.txt")
         return self.model.validate(
             documents=self.ocuments,
             prompt=self.prompt,

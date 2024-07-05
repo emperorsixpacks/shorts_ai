@@ -3,6 +3,7 @@ Utility functions for common tasks in the project.
 """
 
 from __future__ import annotations
+import os
 from typing import TYPE_CHECKING, Self
 
 from dataclasses import dataclass, field
@@ -16,6 +17,8 @@ from redis import Redis
 if TYPE_CHECKING:
     from video_generator.settings import BucketSettings
 
+def return_base_dir():
+    return os.path.dirname(os.path.abspath("")) # os.path.abspath(path=__file__))
 
 class SupportedMediaFileType(StrEnum):
     """

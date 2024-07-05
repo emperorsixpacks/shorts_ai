@@ -1,4 +1,6 @@
 """
+Should be removed, not necessary 
+
 This module provides functionality for managing prompts in the video generation pipeline.
 
 It includes classes and functions for reading prompts from files, checking the validity of file locations,

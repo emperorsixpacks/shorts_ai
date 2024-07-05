@@ -3,6 +3,7 @@ import re
 from enum import StrEnum
 from dataclasses import dataclass, field
 
+from video_generator.utils import return_base_dir
 from video_generator.session_manager import Session
 from video_generator.exceptions.sessionExceptions import ServerTimeOutError
 from video_generator.exceptions.promptExceptions import (
@@ -14,6 +15,7 @@ from video_generator.exceptions.promptExceptions import (
 class ReaderType(StrEnum):
     URL = "URL"
     FILE = "FILE"
+
 
 
 @dataclass
@@ -35,6 +37,14 @@ class BaseReader:
             self._type = ReaderType.URL
             self.session: Session = Session(location=self.file_path)
         self._type = ReaderType.FILE
+
+    @staticmethod
+    def prompts_dir() -> str | None:
+        prompts_dir = os.path.join(return_base_dir(), "prompts")
+        if not os.path.exists(prompts_dir):
+            return None
+        return prompts_dir
+        
 
     @staticmethod
     def check_path(path: str) -> bool:
@@ -78,11 +88,11 @@ class BaseReader:
         if self.path_is_url(self.file_path):
             if self.session.ping() != 200:
                 raise InvalidLocationError(location=self.file_path)
-
-        if not self.check_path(self.file_path):
+            
+        prompt_dir = os.path.join(BaseReader.prompts_dir(), self.file_path)
+        if not self.check_path(prompt_dir):
             raise InvalidLocationError(location=self.file_path)
-
-        return self.file_path
+        return prompt_dir
 
     def return_name_and_type(self):
         """
