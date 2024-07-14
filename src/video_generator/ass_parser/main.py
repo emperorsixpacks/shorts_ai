@@ -15,15 +15,27 @@ import numpy as np
 from .exceptions import UnsupportedFileFormatError
 
 
-DEFAULT_FIELDS =[
-            "Name",
-            "Fontname",
-            "Fontsize",
-            "PrimaryColour",
-            "SecondaryColour",
-            "OutlineColour",
-            "BackgroundColor",
-        ]
+DEFAULT_ORDERING_FIELDS = [
+    "Name",
+    "Fontname",
+    "Fontsize",
+    "PrimaryColour",
+    "SecondaryColour",
+    "OutlineColour",
+    "BackgroundColor",
+]
+
+DEFAULT_DIALOGUE_FIELDS = [
+    "Layer",
+    "Start",
+    "End",
+    "Style",
+    "MarginL",
+    "MarginR",
+    "MarginV",
+    "Text",
+]
+
 
 @dataclass
 class Transcript:
@@ -144,7 +156,7 @@ class Format(BaseModel):
     name: str = Field(default="Format", init=False, frozen=True)
     """The name of the format."""
 
-    fields: List[str] = Field(default=DEFAULT_FIELDS)
+    fields: List[str] = Field(default=None)
     """A list of field names that are used in the format."""
 
     def return_fields_str(self) -> str:
@@ -483,32 +495,12 @@ if __name__ == "__main__":
     transcripts = Transcript.open_transcript_json(
         file_path="/home/emperorsixpacks/Downloads/asrOutput(2).json"
     )
-    ordering_format = Format(
-        fields=[
-            "Name",
-            "Fontname",
-            "Fontsize",
-            "PrimaryColour",
-            "SecondaryColour",
-            "OutlineColour",
-            "BackgroundColor",
-        ]
-    )
-    # print(transcripts)
+    ordering_format = Format(fields=DEFAULT_ORDERING_FIELDS)
 
     style = Style(order_format=ordering_format)
     print(style.return_entry_str())
     dialogue_format = Format(
-        fields=[
-            "Layer",
-            "Start",
-            "End",
-            "Style",
-            "MarginL",
-            "MarginR",
-            "MarginV",
-            "Text",
-        ]
+        fields=DEFAULT_DIALOGUE_FIELDS
     )
     # print(Dialogue(Text="Hello", style=style, Start=1111, End=222, ordering_format=dialogue_format))
     dialogues = Dialogue.from_list(
@@ -518,7 +510,7 @@ if __name__ == "__main__":
         focus_style=r"{\xbord20}{\ybord10}{\3c&HD4AF37&\1c&HFFFFFF&}",
         MarginL=1,
         MarginR=1,
-        MarginV=1
+        MarginV=1,
     )
     # dialogue = Dialogue(ordering_format=dialogue_format, style=style)
 
