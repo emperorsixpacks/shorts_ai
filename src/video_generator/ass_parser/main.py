@@ -15,6 +15,16 @@ import numpy as np
 from .exceptions import UnsupportedFileFormatError
 
 
+DEFAULT_FIELDS =[
+            "Name",
+            "Fontname",
+            "Fontsize",
+            "PrimaryColour",
+            "SecondaryColour",
+            "OutlineColour",
+            "BackgroundColor",
+        ]
+
 @dataclass
 class Transcript:
     """
@@ -134,7 +144,7 @@ class Format(BaseModel):
     name: str = Field(default="Format", init=False, frozen=True)
     """The name of the format."""
 
-    fields: List[str] = Field(default=None)
+    fields: List[str] = Field(default=DEFAULT_FIELDS)
     """A list of field names that are used in the format."""
 
     def return_fields_str(self) -> str:
@@ -144,8 +154,8 @@ class Format(BaseModel):
         :return: A string containing the values of all the fields in the current object, joined by commas.
         :rtype: str
         """
-        fields = ",".join(self.fields)
-        return fields
+        _fields = ",".join(self.fields)
+        return _fields
 
 
 class Entry(BaseModel):
