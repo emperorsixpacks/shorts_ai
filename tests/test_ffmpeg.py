@@ -1,12 +1,12 @@
 from unittest.mock import patch, MagicMock
 from src.py_ffmpeg.main import PyFFmpeg, InputFile
-from src.utils import MediaFile, SupportedMediaFileType
+from src.utils import MediaFile, MediaFileType
 from src.settings import AWSSettings
 
 
 # Test Data 
-input_medai_file_1 = MediaFile(name="test_input_file_1", url="test_video.mp4", file_type=SupportedMediaFileType.VIDEO)
-input_medai_file_2 = MediaFile(name="test_input_file_2", url="test_audio.mp3", file_type=SupportedMediaFileType.AUDIO)
+input_medai_file_1 = MediaFile(name="test_input_file_1", url="test_video.mp4", file_type=MediaFileType.VIDEO)
+input_medai_file_2 = MediaFile(name="test_input_file_2", url="test_audio.mp3", file_type=MediaFileType.AUDIO)
 input_video = InputFile(media_file=input_medai_file_1)
 input_audio = InputFile(media_file=input_medai_file_2)
 output_location = MediaFile(name="test", url="output.mp4")

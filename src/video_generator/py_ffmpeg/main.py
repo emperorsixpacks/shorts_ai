@@ -8,7 +8,7 @@ from tempfile import NamedTemporaryFile
 
 import ffmpeg
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator, FilePath
-from utils import MediaFile, SupportedMediaFileType, upload_file_to_s3
+from utils import MediaFile, MediaFileType, upload_file_to_s3
 from settings import BucketSettings
 
 from .exceptions import UnsupportedMediaFileError
@@ -49,10 +49,10 @@ class InputFile(BaseModel):
         Raises:
             UnsupportedMediaFileError: If the media file is not of a supported type.
         """
-        if not isinstance(self.media_file.file_type, SupportedMediaFileType):
+        if not isinstance(self.media_file.file_type, MediaFileType):
             raise UnsupportedMediaFileError()
         self.stream = ffmpeg.input(self.media_file.url)
-        if self.media_file.file_type == SupportedMediaFileType.VIDEO:
+        if self.media_file.file_type == MediaFileType.VIDEO:
             self.media_file = self.media_file.set_duration()
         return self
 

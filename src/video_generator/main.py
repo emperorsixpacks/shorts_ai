@@ -5,7 +5,7 @@ import time
 from typing import List, Dict
 from tempfile import NamedTemporaryFile
 import itertools
-from functools import lru_cache
+
 
 import requests
 import wikipediaapi
@@ -23,10 +23,10 @@ from langchain.chains.llm import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings.huggingface import HuggingFaceBgeEmbeddings
+
 from langchain.vectorstores.redis import RedisVectorStoreRetriever, Redis
 
-from settings import (
+from video_generator.settings import (
     RedditSettings,
     RedisSettings,
     EmbeddingSettings,
@@ -35,10 +35,10 @@ from settings import (
     BucketSettings,
 )
 
-from utils import MediaFile, Story, WikiPage, SupportedMediaFileType, upload_file_to_s3
+from video_generator.utils import MediaFile, Story, WikiPage, MediaFileType, upload_file_to_s3
 
-from py_ffmpeg.main import PyFFmpeg, InputFile
-from ass_parser.main import Transcript, Style, Dialogue, Section, PyAss, Format
+from video_generator.py_ffmpeg.main import PyFFmpeg, InputFile
+from video_generator.ass_parser.main import Transcript, Style, Dialogue, Section, PyAss, Format
 
 
 logger = logging.getLogger(__name__)
@@ -87,12 +87,6 @@ ner_model = InferenceClient(token=hf_hub_settings.HuggingFacehub_api_token)
 # )
 
 
-@lru_cache
-def load_embeddings_model():
-    """
-    A description of the entire function, its parameters, and its return types.
-    """
-    return HuggingFaceBgeEmbeddings(model_name=embeddings_settings.embedding_model)
 
 
 embeddings = load_embeddings_model()
@@ -147,7 +141,7 @@ def get_videos_from_subreddit(number_of_videos: int = 4):
     return [
         MediaFile(
             name=video.get("title"),
-            file_type=SupportedMediaFileType.VIDEO,
+            file_type=MediaFileType.VIDEO,
             url=video.get("url"),
             author=video.get("author"),
         )
@@ -200,7 +194,7 @@ def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
     """
 
     logger.info("Converting text to audio")
-    media_file = MediaFile(name=name, file_type=SupportedMediaFileType.AUDIO)
+    media_file = MediaFile(name=name, file_type=MediaFileType.AUDIO)
     data = {"msg": text.text, "lang": "Matthew", "source": "ttsmp3"}
     audio_url = requests.post(
         "https://ttsmp3.com/makemp3_new.php", data=data, timeout=60
@@ -519,7 +513,7 @@ def main():
     # )
     # number_of_videos = int(audio_file.duration // 10)
     # videos = get_videos_from_subreddit(number_of_videos=number_of_videos)
-    # video_file = MediaFile(name=prompt, file_type=SupportedMediaFileType.VIDEO)
+    # video_file = MediaFile(name=prompt, file_type=MediaFileType.VIDEO)
     # trascript = transcribe_audio(aws_transcribe_client, audio=audio_file)
 
     # transcripts = Transcript.open_transcript_json(file_path=trascript)

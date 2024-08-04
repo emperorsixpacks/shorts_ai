@@ -17,7 +17,6 @@ class ReaderType(StrEnum):
     FILE = "FILE"
 
 
-
 @dataclass
 class BaseReader:
     """
@@ -44,7 +43,6 @@ class BaseReader:
         if not os.path.exists(prompts_dir):
             return None
         return prompts_dir
-        
 
     @staticmethod
     def check_path(path: str) -> bool:
@@ -88,11 +86,11 @@ class BaseReader:
         if self.path_is_url(self.file_path):
             if self.session.ping() != 200:
                 raise InvalidLocationError(location=self.file_path)
-            
-        prompt_dir = os.path.join(BaseReader.prompts_dir(), self.file_path)
-        if not self.check_path(prompt_dir):
+
+        prompt_path = os.path.join(BaseReader.prompts_dir(), self.file_path)
+        if not self.check_path(prompt_path):
             raise InvalidLocationError(location=self.file_path)
-        return prompt_dir
+        return prompt_path
 
     def return_name_and_type(self):
         """
@@ -167,7 +165,6 @@ class TextReader(BaseReader):
         reader = {ReaderType.URL: self._read_from_url, ReaderType.FILE: self._open_file}
 
         return reader.get(self._type)()
-
 
 
 # TODO look into converting the read method into a class method

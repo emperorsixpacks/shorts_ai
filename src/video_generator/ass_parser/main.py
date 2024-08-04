@@ -498,11 +498,7 @@ if __name__ == "__main__":
     ordering_format = Format(fields=DEFAULT_ORDERING_FIELDS)
 
     style = Style(order_format=ordering_format)
-    print(style.return_entry_str())
-    dialogue_format = Format(
-        fields=DEFAULT_DIALOGUE_FIELDS
-    )
-    # print(Dialogue(Text="Hello", style=style, Start=1111, End=222, ordering_format=dialogue_format))
+    dialogue_format = Format(fields=DEFAULT_DIALOGUE_FIELDS)
     dialogues = Dialogue.from_list(
         transcripts,
         dialogue_style=style,
@@ -512,15 +508,13 @@ if __name__ == "__main__":
         MarginR=1,
         MarginV=1,
     )
-    # dialogue = Dialogue(ordering_format=dialogue_format, style=style)
+    dialogue = Dialogue(ordering_format=dialogue_format, style=style)
 
-    # sript_info = Section(title="Script Info", fields=(["title", "Sample project"]))
-    # event_fields = [["Format", dialogue_format.return_fields_str()]]
-    # for dialogue in dialogues:
-    #     event_fields.append(dialogue)
-    # events = Section(
-    #     title="Events",
-    #     fields=event_fields,
-    # )
-    # with PyAss("test.ass", "w", sections=[events]) as ass:
-    #     ass.write()
+    sript_info = Section(title="Script Info", fields=(["title", "Sample project"]))
+    event_fields = [["Format", dialogue_format.return_fields_str()]].extend(dialogues)
+    events = Section(
+        title="Events",
+        fields=event_fields,
+    )
+    with PyAss("test.ass", "w", sections=[events]) as ass:
+        ass.write()

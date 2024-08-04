@@ -9,9 +9,6 @@ and handling exceptions related to prompts.
 Classes:
     SupportedFileTypes: An enumeration of supported file types for prompts.
     PromptManager: A class for managing prompts, including reading prompts from files and checking file locations.
-
-Functions:
-    get_prompt_manager: A factory function for creating a PromptManager instance.
 """
 
 from enum import StrEnum
@@ -53,20 +50,5 @@ class PromptManager:
         
         self.contents: str | None  = self.file_reader.read()
         return self
-
-
-
-def get_prompt_manager(file_reader: FileReader) -> Self:
-    """
-    Factory function for creating a PromptManager instance.
-
-    Args:
-        file_reader (FileReader): An instance of a class implementing the FileReader protocol.
-
-    Returns:
-        PromptManager: A PromptManager instance.
-    """
-    return PromptManager(file_reader=file_reader.file_path)
-
 
 # TODO write tests

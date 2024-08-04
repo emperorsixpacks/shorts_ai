@@ -5,6 +5,7 @@ Utility functions for common tasks in the project.
 from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Self
+from functools import lru_cache
 
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -13,14 +14,22 @@ from datetime import datetime
 from ibm_botocore.exceptions import ClientError
 import ffmpeg
 from redis import Redis
+import asyncpraw
+from langchain.embeddings.huggingface import HuggingFaceBgeEmbeddings
 
 if TYPE_CHECKING:
-    from video_generator.settings import BucketSettings
+    from video_generator.settings import (
+        BucketSettings,
+        HuggingFaceHubSettings,
+        RedditSettings,
+    )
+
 
 def return_base_dir():
-    return os.path.dirname(os.path.abspath("")) # os.path.abspath(path=__file__))
+    return os.path.dirname(os.path.abspath(""))  # os.path.abspath(path=__file__))
 
-class SupportedMediaFileType(StrEnum):
+
+class MediaFileType(StrEnum):
     """
     Supported media file types for downloading and converting
     """
@@ -41,11 +50,13 @@ class MediaFile:
     """
 
     name: str
-    file_type: SupportedMediaFileType
+    file_type: MediaFileType
     size: int = None
     url: str = None
     author: str = None
-    timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()), init=False)
+    timestamp: int = field(
+        default_factory=lambda: int(datetime.now().timestamp()), init=False
+    )
 
     def __post_init__(self):
         self.name: str = self._format_name()
@@ -60,19 +71,19 @@ class MediaFile:
         """
         self.name = self.name.replace(" ", "_").lower()
         match self.file_type:
-            case SupportedMediaFileType.VIDEO:
+            case MediaFileType.VIDEO:
                 return f"video_{self.name}-{self.timestamp}.{self.file_type}"
 
-            case SupportedMediaFileType.AUDIO:
+            case MediaFileType.AUDIO:
                 return f"audio_{self.name}-{self.timestamp}.{self.file_type}"
-        
+
     def set_location(self, settings: BucketSettings) -> Self:
         """
         Sets the location URL of the media file by combining the fastly URL from the provided 'settings' with the file name.
-        
+
         Args:
             settings (BucketSettings): The settings object containing the fastly URL.
-        
+
         Returns:
             Self: The updated instance of the MediaFile with the URL set.
         """
@@ -89,12 +100,12 @@ class MediaFile:
             int: The duration of the media file in seconds.
             None: If the location attribute is None or the media file cannot be probed.
         """
-            
+
         if self.url is not None:
             self.duration = float(ffmpeg.probe(self.url)["format"]["duration"])
             return self
         return None
-    
+
     def get_s3_location(self, settings: BucketSettings) -> str:
         """
         Returns the S3 location of the media file based on the provided settings.
@@ -105,7 +116,6 @@ class MediaFile:
         Returns:
             str: The S3 location of the media file.
         """
-        
 
 
 class AWSS3Method(StrEnum):
@@ -115,7 +125,6 @@ class AWSS3Method(StrEnum):
 
     PUT = "put_object"
     GET = "get_object"
-
 
 
 @dataclass
@@ -135,8 +144,6 @@ class WikiPage:
 
     def __str__(self):
         return self.page_title
-
-
 
 
 def upload_file_to_s3(
@@ -166,9 +173,7 @@ def upload_file_to_s3(
                 Fileobj=file,
                 Bucket=bucket_settings.bucket_name,
                 Key=media_file.name,
-                ExtraArgs={
-                    "ContentType": media_file.file_type
-                }
+                ExtraArgs={"ContentType": media_file.file_type},
             )
 
     except ClientError:
@@ -177,16 +182,32 @@ def upload_file_to_s3(
     return True
 
 
-
-def check_index_exists(client: Redis, index_name: str) -> bool:
+def index_exists(client: Redis, index_name: str) -> bool:
     """Check if Redis index exists."""
     try:
         client.ft(index_name).info()
-    except:  # noqa: E722
+    except:
         # logger.debug("Index does not exist")
         print("Index does not exit")
         return False
     # logger.debug("Index already exmists")
     return True
+
+
+@lru_cache
+def load_embeddings_model(embeddings_settings: HuggingFaceHubSettings):
+    """
+    A description of the entire function, its parameters, and its return types.
+    """
+    return HuggingFaceBgeEmbeddings(model_name=embeddings_settings.embedding_model)
+
+
+def get_reddit_client(reddit_settings: RedditSettings):
+    return asyncpraw.Reddit(
+        client_id=reddit_settings.reddit_client_id,
+        client_secret=reddit_settings.reddit_client_secret,
+        user_agent="vidoe_bot",
+    )
+
 
 # TODO add interface for both AWS and IBM Cloud
