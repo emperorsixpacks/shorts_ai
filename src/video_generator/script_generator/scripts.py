@@ -20,7 +20,7 @@ MIN_VIDEO_LENGTH = 5
 MAX_VIDEO_LENGTH = 12
 MIN_VIDEO_HEIGHT = 1000
 MIN_VIDEO_WIDTH = 1000
-DEFAULT_SUBREDDITS = ["oddlysatisfying"]
+DEFAULT_SUBREDDITS = ["oddlysatisfying", "PerfectTiming", "satisfying"]
 DEFAULT_NUMBER_OF_VIDEOS = 4
 BOOL_DICT = {"True": True, "False": False}
 
@@ -227,7 +227,5 @@ if __name__ == "__main__":
     settings = RedditSettings()
 
     asyncio.run(
-        Script.get_videos_from_subreddit(
-            reddit_settings=settings, number_of_videos=4
-        )
+        Script.get_videos_from_subreddit(reddit_settings=settings, number_of_videos=4)
     )
