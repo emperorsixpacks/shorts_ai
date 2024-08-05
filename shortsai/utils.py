@@ -29,6 +29,7 @@ from shortsai.constants import (
     DEFAULT_WIKIPEDIA_SEARCH_PARAMS,
     WIKI_API_SEARCH_URL,
     TTS_MAKER_URL,
+    return_app_dir,
 )
 
 if TYPE_CHECKING:
@@ -39,13 +40,6 @@ if TYPE_CHECKING:
         RedisSettings,
     )
     from wikipediaapi import Wikipedia
-
-
-def get_base_url(path):
-    return os.path.dirname(os.path.abspath(path=path))
-
-def return_base_dir():
-    return os.path.dirname(os.path.abspath(""))  # os.path.abspath(path=__file__))
 
 
 class MediaFileType(StrEnum):
@@ -156,7 +150,7 @@ class WikiPage:
     """
 
     page_title: str
-    wikipidea_client: Wikipedia
+    wikipidea_client: Wikipedia = field(default=None)
     text: str = field(default=None)
 
     def __post_init__(self):

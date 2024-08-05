@@ -1,14 +1,22 @@
 import os
-from flask import Blueprint, request, render_template
-from shortsai.utils import return_base_dir
+from flask import Blueprint, render_template
+from shortsai.constants import BASE_DIR
 
-TEMPLATES_LOCATION =os.path.join(return_base_dir(), "public/templates")
+TEMPLATES_LOCATION = os.path.join(BASE_DIR, "public/templates")
 
-router =  Blueprint(name="routes", import_name="routes", template_folder=TEMPLATES_LOCATION)
 
-@app.post("/generate")
+router = Blueprint(
+    name="routes", import_name="routes", template_folder=TEMPLATES_LOCATION
+)
+
+
+@router.route("/generate", methods=["GET", "POST"])
 def index_page():
-    return render_template("generate.html")
+
+    context = {
+        "page_title": "Generate Video"
+    }
+    return render_template("generate.html", **context)
     # prompt = request.form.get("prompt", None)
     # entities = extract_entities(text=prompt)
     # tokens = [wiki_search(entity) for entity in entities]
@@ -39,6 +47,6 @@ def index_page():
     # print(story.text)
 
 
-@app.post("story/video_id={video_id}")
-def generate_new_video(video_id):
-    return render_template("generate.html")
+# @router.post("story/video_id={video_id}")
+# def generate_new_video(video_id):
+#     return render_template("generate.html")

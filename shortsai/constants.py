@@ -1,3 +1,8 @@
+import os
+
+def return_app_dir():
+    return os.path.dirname(os.path.abspath(__file__))  # os.path.abspath(path=__file__))
+
 DEFAULT_WIKIPEDIA_SEARCH_LIMIT = "4"
 
 DEFAULT_WIKIPEDIA_SEARCH_PARAMS = {
@@ -22,3 +27,5 @@ MIN_VIDEO_WIDTH = 1000
 DEFAULT_SUBREDDITS = ["oddlysatisfying", "PerfectTiming", "satisfying"]
 DEFAULT_NUMBER_OF_VIDEOS = 4
 BOOL_DICT = {"True": True, "False": False}
+
+BASE_DIR = os.path.dirname(os.path.abspath(return_app_dir()))

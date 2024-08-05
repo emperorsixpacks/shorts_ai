@@ -3,7 +3,7 @@ import re
 from enum import StrEnum
 from dataclasses import dataclass, field
 
-from shortsai.utils import return_base_dir
+from shortsai.utils import return_app_dir
 from shortsai.session_manager import Session
 from shortsai.video_generator.exceptions.sessionExceptions import ServerTimeOutError
 from shortsai.video_generator.exceptions.promptExceptions import (
@@ -39,7 +39,7 @@ class BaseReader:
 
     @staticmethod
     def prompts_dir() -> str | None:
-        prompts_dir = os.path.join(return_base_dir(), "prompts")
+        prompts_dir = os.path.join(return_app_dir(), "prompts")
         if not os.path.exists(prompts_dir):
             return None
         return prompts_dir

@@ -47,7 +47,7 @@ class SessionManager(BaseModel):
     def send_requst(
         self,
         request_method: RequestMethods = RequestMethods.DELETE,
-        params: Optional[Dict[str]] = None,
+        params: Optional[Dict[str, str]] = None,
     ) -> requests.Response:
         """
         Sends a request to the specified URL using the provided request method.
@@ -101,7 +101,7 @@ class Session(SessionManager):
         """
         return self.send_requst(request_method=RequestMethods.HEAD).status_code
 
-    def _get_content(self, params: Optional[Dict[str]] = None) -> requests.Response:
+    def _get_content(self, params: Optional[Dict[str, str]] = None) -> requests.Response:
         """
         Sends a GET request to the specified URL and returns the response content.
 
@@ -120,10 +120,10 @@ class Session(SessionManager):
 
         return response
 
-    def get_json(self, params: Optional[Dict[str]] = None) -> Dict[str]:
+    def get_json(self, params: Optional[Dict[str, str]] = None) -> Dict[str, str]:
         return self._get_content(params=params).json()
 
-    def get_txt(self, params: Optional[Dict[str]] = None) -> str:
+    def get_txt(self, params: Optional[Dict[str, str]] = None) -> str:
         return self._get_content(params=params).text
 
 
