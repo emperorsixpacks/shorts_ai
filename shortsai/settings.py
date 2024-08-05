@@ -18,6 +18,12 @@ class BaseConfig(BaseSettings):
     )
 
 
+class ServerSettings(BaseConfig):
+
+    server_host: str = "localhost"
+    server_port: str = "8000"
+    debug: bool = "True"
+
 class RedditSettings(BaseConfig):
     """
     Settings for Reddit API credentials.

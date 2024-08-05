@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Name of the Python script
+PYTHON_SCRIPT="shortsai.server.run"
+
+# Required Python version
+REQUIRED_PYTHON_MINOR_VERSION=11
+
+REQUIRED_PYTHON_MAJOR_VERSION=3
+
+PYTHON_PATH=$(which python)
+
+if [[ -z "$PYTHON_PATH" ]]; then
+    echo "Error: Python has not been installed, please install python3.11 or higher"
+    exit 1
+fi
+
+PYTHON_MINOR_VERSION=$($PYTHON_PATH -c 'import sys; print(sys.version_info.minor)')
+
+PYTHON_MAJOR_VERSION=$($PYTHON_PATH -c 'import sys; print(sys.version_info.major)')
+
+if [[ $PYTHON_MAJOR_VERSION -lt $REQUIRED_PYTHON_MAJOR_VERSION || $PYTHON_MINOR_VERSION -lt $REQUIRED_PYTHON_MINOR_VERSION ]]; then
+    echo "Error: Python $REQUIRED_PYTHON_MAJOR_VERSION.$REQUIRED_PYTHON_MINOR_VERSION or higher is required, but found $PYTHON_MAJOR_VERSION.$PYTHON_MINOR_VERSION"
+    exit 1
+fi
+
+
+
+# Run the Python script
+
+$PYTHON_PATH -m $PYTHON_SCRIPT
+
+# exit with the exit code of the Python script
+if [[ $? -eq 0 ]]; then
+    echo "Python script executed successfully."
+else
+    echo "Python script failed to execute."
+    exit 1
+fi

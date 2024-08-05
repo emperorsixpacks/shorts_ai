@@ -1,10 +1,10 @@
 import os
-from flask import Flask, request, render_template
+from flask import Blueprint, request, render_template
 from shortsai.utils import return_base_dir
 
 TEMPLATES_LOCATION =os.path.join(return_base_dir(), "public/templates")
 
-app =  Flask(import_name="shorts ai server", template_folder=TEMPLATES_LOCATION)
+router =  Blueprint(name="routes", import_name="routes", template_folder=TEMPLATES_LOCATION)
 
 @app.post("/generate")
 def index_page():
