@@ -9,20 +9,19 @@ from pydantic import BaseModel, model_validator, ConfigDict
 from langchain.schema import Document
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from video_generator.settings import LLMSettings, RedditSettings
-from video_generator.prompts_manager import TextReader
-from video_generator.utils import get_reddit_client, MediaFile, MediaFileType
 
-
-VALIDATION_PROMPT = "validation_prompt.txt"
-
-MIN_VIDEO_LENGTH = 5
-MAX_VIDEO_LENGTH = 12
-MIN_VIDEO_HEIGHT = 1000
-MIN_VIDEO_WIDTH = 1000
-DEFAULT_SUBREDDITS = ["oddlysatisfying", "PerfectTiming", "satisfying"]
-DEFAULT_NUMBER_OF_VIDEOS = 4
-BOOL_DICT = {"True": True, "False": False}
+from shortsai.video_generator.prompts_manager import TextReader
+from shortsai.settings import LLMSettings, RedditSettings
+from shortsai.utils import get_reddit_client, MediaFile, MediaFileType
+from shortsai.constants import (
+    MIN_VIDEO_HEIGHT,
+    MIN_VIDEO_LENGTH,
+    MAX_VIDEO_LENGTH,
+    MIN_VIDEO_WIDTH,
+    DEFAULT_SUBREDDITS,
+    DEFAULT_NUMBER_OF_VIDEOS,
+    BOOL_DICT,
+)
 
 
 def extract_answer(llm_output):
@@ -126,7 +125,7 @@ class Script(BaseModel):
     async def _get_reddit_videos(
         cls, subreddit: str, praw_client, number_of_videos: int
     ) -> List[MediaFile]:
-        
+
         def is_valid_video(
             video_data: Dict[str, Optional[float]],
             duration: float,
@@ -225,6 +224,10 @@ if __name__ == "__main__":
 
     settings = RedditSettings()
 
-    print(asyncio.run(
-        Script.get_videos_from_subreddit(reddit_settings=settings, number_of_videos=4)
-    ))
+    print(
+        asyncio.run(
+            Script.get_videos_from_subreddit(
+                reddit_settings=settings, number_of_videos=4
+            )
+        )
+    )

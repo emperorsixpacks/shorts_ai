@@ -1,13 +1,14 @@
+import os
 from flask import Flask, request, render_template
+from shortsai.utils import return_base_dir
 
-TEMPLATES_LOCATION = ""
-STATIC_FILES_LOCATION = ""
+TEMPLATES_LOCATION =os.path.join(return_base_dir(), "public/templates")
 
-app =  Flask(import_name="shorts ai server")
+app =  Flask(import_name="shorts ai server", template_folder=TEMPLATES_LOCATION)
 
 @app.post("/generate")
 def index_page():
-    return render_template("base.html")
+    return render_template("generate.html")
     # prompt = request.form.get("prompt", None)
     # entities = extract_entities(text=prompt)
     # tokens = [wiki_search(entity) for entity in entities]
@@ -36,3 +37,8 @@ def index_page():
     #     return
     # story = generate_story(user_prompt=prompt, context_documents=documents)
     # print(story.text)
+
+
+@app.post("story/video_id={video_id}")
+def generate_new_video(video_id):
+    return render_template("generate.html")

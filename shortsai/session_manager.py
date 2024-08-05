@@ -11,7 +11,7 @@ from typing import TypeVar, Dict, Optional
 import requests
 from pydantic import BaseModel, AnyUrl, Field, ConfigDict
 
-from video_generator.exceptions.sessionExceptions import (
+from shortsai.video_generator.exceptions.sessionExceptions import (
     ServerTimeOutError,
     ResourceNotFoundError,
     ServerError,

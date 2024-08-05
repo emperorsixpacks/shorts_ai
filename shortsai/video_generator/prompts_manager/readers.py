@@ -3,10 +3,10 @@ import re
 from enum import StrEnum
 from dataclasses import dataclass, field
 
-from video_generator.utils import return_base_dir
-from video_generator.session_manager import Session
-from video_generator.exceptions.sessionExceptions import ServerTimeOutError
-from video_generator.exceptions.promptExceptions import (
+from shortsai.utils import return_base_dir
+from shortsai.session_manager import Session
+from shortsai.video_generator.exceptions.sessionExceptions import ServerTimeOutError
+from shortsai.video_generator.exceptions.promptExceptions import (
     UnsupportedFileFormatError,
     InvalidLocationError,
 )

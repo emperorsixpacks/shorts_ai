@@ -24,10 +24,15 @@ from langchain.embeddings.huggingface import HuggingFaceBgeEmbeddings
 from langchain.vectorstores.redis import RedisVectorStoreRetriever, Redis
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-from video_generator.session_manager import Session
+from shortsai.session_manager import Session
+from shortsai.constants import (
+    DEFAULT_WIKIPEDIA_SEARCH_PARAMS,
+    WIKI_API_SEARCH_URL,
+    TTS_MAKER_URL,
+)
 
 if TYPE_CHECKING:
-    from video_generator.settings import (
+    from shortsai.settings import (
         BucketSettings,
         HuggingFaceHubSettings,
         RedditSettings,
@@ -35,21 +40,9 @@ if TYPE_CHECKING:
     )
     from wikipediaapi import Wikipedia
 
-DEFAULT_WIKIPEDIA_SEARCH_LIMIT = "4"
 
-DEFAULT_WIKIPEDIA_SEARCH_PARAMS = {
-    "action": "query",
-    "format": "json",
-    "prop": "revisions",
-    "rvprop": "content",
-    "rvslots": "main",
-    "limit": DEFAULT_WIKIPEDIA_SEARCH_LIMIT,
-}
-
-
-WIKI_API_SEARCH_URL = "https://en.wikipedia.org/w/rest.php/v1/search/page"
-TTS_MAKER_URL = "https://ttsmp3.com/makemp3_new.php"
-
+def get_base_url(path):
+    return os.path.dirname(os.path.abspath(path=path))
 
 def return_base_dir():
     return os.path.dirname(os.path.abspath(""))  # os.path.abspath(path=__file__))

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Form Page with HTMX</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@2.39.0/dist/full.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@1.9.2/dist/htmx.min.js"></script>
+</head>
+<body class="bg-gray-100">
+
+    <div class="flex h-screen">
+        <!-- Multi-Form Section -->
+        <div class="w-1/2 bg-white p-8">
+            <div id="form-container" hx-get="generate" hx-trigger="load" hx-target="#form-container">
+                <!-- Form content will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Text Content Section -->
+        <div class="w-1/2 bg-gray-200 p-8">
+            <h1 class="text-3xl font-bold mb-4">Welcome to Our Multi-Step Form</h1>
+            <p class="mb-4">Please fill out the form on the left side to get started. Each step collects different pieces of information from you. If you need any help or have any questions, feel free to contact us.</p>
+            <p class="mb-4">Our form is designed to be user-friendly and straightforward. We appreciate your time and effort in filling out the form and look forward to assisting you.</p>
+        </div>
+    </div>
+
+</body>
+</html>

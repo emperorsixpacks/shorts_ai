@@ -1,2 +1,2 @@
-from video_generator.prompts_manager.manager import PromptManager
-from video_generator.prompts_manager.readers import TextReader
+from shortsai.video_generator.prompts_manager.manager import PromptManager
+from shortsai.video_generator.prompts_manager.readers import TextReader

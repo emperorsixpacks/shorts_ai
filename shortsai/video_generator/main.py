@@ -26,7 +26,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from langchain.vectorstores.redis import RedisVectorStoreRetriever, Redis
 
-from video_generator.settings import (
+from shortsai.video_generator.settings import (
     RedditSettings,
     RedisSettings,
     EmbeddingSettings,
@@ -35,10 +35,10 @@ from video_generator.settings import (
     BucketSettings,
 )
 
-from video_generator.utils import MediaFile, Story, WikiPage, MediaFileType, upload_file_to_s3
+from shortsai.video_generator.utils import MediaFile, Story, WikiPage, MediaFileType, upload_file_to_s3
 
-from video_generator.py_ffmpeg.main import PyFFmpeg, InputFile
-from video_generator.ass_parser.main import Transcript, Style, Dialogue, Section, PyAss, Format
+from shortsai.video_generator.py_ffmpeg.main import PyFFmpeg, InputFile
+from shortsai.video_generator.ass_parser.main import Transcript, Style, Dialogue, Section, PyAss, Format
 
 
 logger = logging.getLogger(__name__)

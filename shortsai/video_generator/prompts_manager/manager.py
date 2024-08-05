@@ -15,9 +15,9 @@ from enum import StrEnum
 from typing import Self
 from dataclasses import dataclass, field
 
-from video_generator.prompts_manager.protocols import FileReader
+from shortsai.video_generator.prompts_manager.protocols import FileReader
 
-from video_generator.exceptions.promptExceptions import (
+from shortsai.video_generator.exceptions.promptExceptions import (
     UnsupportedFileFormatError,
 )
 
