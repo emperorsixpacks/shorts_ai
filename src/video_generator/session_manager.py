@@ -4,8 +4,9 @@ This module provides functionality for managing sessions.
 It includes classes and functions for sending requests, closing sessions, and handling exceptions.
 
 """
+
 from enum import StrEnum
-from typing import TypeVar
+from typing import TypeVar, Dict, Optional
 
 import requests
 from pydantic import BaseModel, AnyUrl, Field, ConfigDict
@@ -44,7 +45,9 @@ class SessionManager(BaseModel):
     session: RequestSession = Field(default_factory=create_session)
 
     def send_requst(
-        self, request_method: RequestMethods = RequestMethods.DELETE
+        self,
+        request_method: RequestMethods = RequestMethods.DELETE,
+        params: Optional[Dict[str]] = None,
     ) -> requests.Response:
         """
         Sends a request to the specified URL using the provided request method.
@@ -60,9 +63,9 @@ class SessionManager(BaseModel):
 
         """
         try:
-            request = requests.Request(request_method.value, self.url)
+            request = requests.Request(request_method.value, self.url, params=params)
             prepped = self.session.prepare_request(request)
-            responce = self.session.send(prepped, timeout=30)
+            responce = self.session.send(prepped, timeout=60)
             responce.raise_for_status()
         except TimeoutError as e:
             raise ServerTimeOutError(location=self.url) from e
@@ -98,7 +101,7 @@ class Session(SessionManager):
         """
         return self.send_requst(request_method=RequestMethods.HEAD).status_code
 
-    def get_content(self) -> str:
+    def _get_content(self, params: Optional[Dict[str]] = None) -> requests.Response:
         """
         Sends a GET request to the specified URL and returns the response content.
 
@@ -108,13 +111,20 @@ class Session(SessionManager):
         Raises:
             ServerTimeOutError: If the request times out.
         """
-        response = self.send_requst(request_method=RequestMethods.GET)
+        response = self.send_requst(request_method=RequestMethods.GET, params=params)
 
         if response.status_code == 404:
             raise ResourceNotFoundError(location=self.url)
         if response.status_code not in (200, 404):
             raise ServerError(location=self.location, status_code=response.status_code)
 
-        return response.text
+        return response
+
+    def get_json(self, params: Optional[Dict[str]] = None) -> Dict[str]:
+        return self._get_content(params=params).json()
+
+    def get_txt(self, params: Optional[Dict[str]] = None) -> str:
+        return self._get_content(params=params).text
+
 
 # TODO write tests

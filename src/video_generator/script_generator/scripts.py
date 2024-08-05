@@ -5,7 +5,7 @@ import itertools
 from math import ceil
 from typing import List, Protocol, Dict, Optional
 
-from pydantic import BaseModel, model_validator, Field, ConfigDict
+from pydantic import BaseModel, model_validator, ConfigDict
 from langchain.schema import Document
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -86,7 +86,6 @@ class Script(BaseModel):
     llm_settings: LLMSettings
     indexs: List[str]
     model: LLm
-    number_of_videos: int = Field(default=4, gt=0.0)
 
     @model_validator(mode="after")
     def validate_user_prompt(self):
@@ -127,7 +126,7 @@ class Script(BaseModel):
     async def _get_reddit_videos(
         cls, subreddit: str, praw_client, number_of_videos: int
     ) -> List[MediaFile]:
-
+        
         def is_valid_video(
             video_data: Dict[str, Optional[float]],
             duration: float,
@@ -226,6 +225,6 @@ if __name__ == "__main__":
 
     settings = RedditSettings()
 
-    asyncio.run(
+    print(asyncio.run(
         Script.get_videos_from_subreddit(reddit_settings=settings, number_of_videos=4)
-    )
+    ))

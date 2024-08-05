@@ -89,64 +89,64 @@ ner_model = InferenceClient(token=hf_hub_settings.HuggingFacehub_api_token)
 
 
 
-embeddings = load_embeddings_model()
+# embeddings = load_embeddings_model()
 
 
-def get_videos_from_subreddit(number_of_videos: int = 4):
-    """
-    Get videos from a specific subreddit using the PRAW library.
+# def get_videos_from_subreddit(number_of_videos: int = 4):
+#     """
+#     Get videos from a specific subreddit using the PRAW library.
 
-    Returns:
-    list: A list of dictionaries containing video information like title, URL, and author.
-    """
+#     Returns:
+#     list: A list of dictionaries containing video information like title, URL, and author.
+#     """
 
-    logger.info("Getting videos from subreddit")
-    reddit = praw.Reddit(
-        client_id=reddit_settings.reddit_client_id,
-        client_secret=reddit_settings.reddit_client_secret,
-        user_agent="vidoe_bot",
-    )
+#     logger.info("Getting videos from subreddit")
+#     reddit = praw.Reddit(
+#         client_id=reddit_settings.reddit_client_id,
+#         client_secret=reddit_settings.reddit_client_secret,
+#         user_agent="vidoe_bot",
+#     )
 
-    # Get the subreddit instance
-    subreddit = reddit.subreddit("oddlysatisfying")
+#     # Get the subreddit instance
+#     subreddit = reddit.subreddit("oddlysatisfying")
 
-    # Get video submissions
-    videos: List[Dict[str, str]] = []
-    for submission in subreddit.hot(limit=500):
-        if (
-            submission.secure_media is not None
-            and submission.secure_media.get("reddit_video") is not None
-        ):
-            video_data = submission.secure_media["reddit_video"]
-            duration = video_data.get("duration", 0)
-            height = video_data.get("height", 0)
-            width = video_data.get("width", 0)
-            scrubber_media_url = video_data.get("fallback_url")
+#     # Get video submissions
+#     videos: List[Dict[str, str]] = []
+#     for submission in subreddit.hot(limit=500):
+#         if (
+#             submission.secure_media is not None
+#             and submission.secure_media.get("reddit_video") is not None
+#         ):
+#             video_data = submission.secure_media["reddit_video"]
+#             duration = video_data.get("duration", 0)
+#             height = video_data.get("height", 0)
+#             width = video_data.get("width", 0)
+#             scrubber_media_url = video_data.get("fallback_url")
 
-            if (
-                5 <= duration <= 12
-                and height >= 1000
-                and width >= 1000
-                and scrubber_media_url
-            ):
-                videos.append(
-                    {
-                        "title": submission.title,
-                        "url": scrubber_media_url,
-                        "author": submission.author.name,
-                    }
-                )
-    logger.info("Videos retrieved successfully")
-    videos = random.sample(videos, k=number_of_videos + 3)
-    return [
-        MediaFile(
-            name=video.get("title"),
-            file_type=MediaFileType.VIDEO,
-            url=video.get("url"),
-            author=video.get("author"),
-        )
-        for video in videos
-    ]
+#             if (
+#                 5 <= duration <= 12
+#                 and height >= 1000
+#                 and width >= 1000
+#                 and scrubber_media_url
+#             ):
+#                 videos.append(
+#                     {
+#                         "title": submission.title,
+#                         "url": scrubber_media_url,
+#                         "author": submission.author.name,
+#                     }
+#                 )
+#     logger.info("Videos retrieved successfully")
+#     videos = random.sample(videos, k=number_of_videos + 3)
+#     return [
+#         MediaFile(
+#             name=video.get("title"),
+#             file_type=MediaFileType.VIDEO,
+#             url=video.get("url"),
+#             author=video.get("author"),
+#         )
+#         for video in videos
+#     ]
 
 
 def combine_video_and_audio(
@@ -243,241 +243,241 @@ def transcribe_audio(client, *, audio: MediaFile):
         time.sleep(10)
 
 
-def open_prompt_txt(prompt_txt: str) -> str:
-    """
-    Reads and returns the content of the file 'prompt.txt' as a string.
-    """
-    with open(prompt_txt, "r", encoding="utf-8") as f:
-        return f.read()
+# def open_prompt_txt(prompt_txt: str) -> str:
+#     """
+#     Reads and returns the content of the file 'prompt.txt' as a string.
+#     """
+#     with open(prompt_txt, "r", encoding="utf-8") as f:
+#         return f.read()
 
 
-def extract_answer(llm_output):
-    """
-    A function that extracts an answer from the given LLM output. It searches for a pattern that matches '**True**\n\nThe'
-    This function takes in the LLM output as a string and splits it by newline.
-    It then searches for a pattern that matches 'True' or 'False' at the beginning of the first line.
-    The function returns the first match found.
-    """
-    llm_output_list = llm_output.split("\n")
-    result_match = re.findall(r"(True|False)", llm_output_list[0])
-    if result_match[0] == "True":
-        return True
-    elif result_match[0] == "False":
-        return False
-    else:
-        return None
+# def extract_answer(llm_output):
+#     """
+#     A function that extracts an answer from the given LLM output. It searches for a pattern that matches '**True**\n\nThe'
+#     This function takes in the LLM output as a string and splits it by newline.
+#     It then searches for a pattern that matches 'True' or 'False' at the beginning of the first line.
+#     The function returns the first match found.
+#     """
+#     llm_output_list = llm_output.split("\n")
+#     result_match = re.findall(r"(True|False)", llm_output_list[0])
+#     if result_match[0] == "True":
+#         return True
+#     elif result_match[0] == "False":
+#         return False
+#     else:
+#         return None
 
 
-def check_user_prompt(text: str, valid_documents: List[Document]) -> bool:
-    """
-    A function that checks a user prompt against a list of documents and returns a question generated based on the prompt and documents.
+# def check_user_prompt(text: str, valid_documents: List[Document]) -> bool:
+#     """
+#     A function that checks a user prompt against a list of documents and returns a question generated based on the prompt and documents.
 
-    Parameters:
-    - prompt (str): The user prompt to be checked.
-    - documents (List[Document]): A list of Document objects to compare against the user prompt.
+#     Parameters:
+#     - prompt (str): The user prompt to be checked.
+#     - documents (List[Document]): A list of Document objects to compare against the user prompt.
 
-    Returns:
-    - str: The question generated based on the user prompt and documents.
-    """
-    logger.info("Checking user prompt against documents")
-    model = ChatDeepInfra(
-        deepinfra_api_token=llm_settings.deepinfra_api_key,
-        model="google/gemma-1.1-7b-it",
-        max_tokens=5,
-        temperature=0.2,
-        top_p=0.2,
-        top_k=10,
-    )
-    system_message = open_prompt_txt("../prompts/validation_prompt.txt")
-    messages = [
-        SystemMessage(content=system_message),
-        HumanMessage(content=f"user text: {text} \n docuemnts: {valid_documents}"),
-    ]
-    llm_output = model.invoke(messages).content
-    return extract_answer(llm_output=llm_output)
-
-
-def generate_story(user_prompt: str, context_documents: List[Document]) -> Story:
-    """
-    Generates a story based on the user prompt and context documents.
-
-    Parameters:
-        user_prompt (str): The user prompt for generating the story.
-        context_documents (List[Document]): A list of documents providing context for the story.
-
-    Returns:
-        str: The generated story.
-    """
-    logger.info("Generating story")
-    presence_penalty = AI21PenaltyData(scale=4.9)
-    frequency_penalty = AI21PenaltyData(scale=4)
-    llm = AI21(
-        model="j2-mid",
-        ai21_api_key=llm_settings.ai21_api_key,
-        maxTokens=120,
-        presencePenalty=presence_penalty,
-        minTokens=80,
-        frequencyPenalty=frequency_penalty,
-        temperature=0.5,
-        topP=0.2,
-    )
-
-    prompt_template = open_prompt_txt("../prompts/prompt.txt")
-    final_prompt = PromptTemplate(
-        input_variables=["documents", "user"],
-        template=prompt_template,
-    )
-    chain = LLMChain(llm=llm, prompt=final_prompt)
-    question = chain.invoke({"user": user_prompt, "documents": context_documents})
-    logger.info("Story generated successfully")
-    return Story(prompt=user_prompt, text=question["text"])
+#     Returns:
+#     - str: The question generated based on the user prompt and documents.
+#     """
+#     logger.info("Checking user prompt against documents")
+#     model = ChatDeepInfra(
+#         deepinfra_api_token=llm_settings.deepinfra_api_key,
+#         model="google/gemma-1.1-7b-it",
+#         max_tokens=5,
+#         temperature=0.2,
+#         top_p=0.2,
+#         top_k=10,
+#     )
+#     system_message = open_prompt_txt("../prompts/validation_prompt.txt")
+#     messages = [
+#         SystemMessage(content=system_message),
+#         HumanMessage(content=f"user text: {text} \n docuemnts: {valid_documents}"),
+#     ]
+#     llm_output = model.invoke(messages).content
+#     return extract_answer(llm_output=llm_output)
 
 
-def extract_entities(text: str):
-    """
-    A function that returns named entity recognition (NER) tokens from the given text.
+# def generate_story(user_prompt: str, context_documents: List[Document]) -> Story:
+#     """
+#     Generates a story based on the user prompt and context documents.
 
-    Parameters:
-    - text (str): The input text for which NER tokens need to be extracted.
+#     Parameters:
+#         user_prompt (str): The user prompt for generating the story.
+#         context_documents (List[Document]): A list of documents providing context for the story.
 
-    Returns:
-    - list: A list of NER tokens extracted from the input text.
-    """
-    result = ner_model.token_classification(
-        text=text, model=hf_hub_settings.ner_repo_id
-    )
-    return [i["word"].strip() for i in result]
+#     Returns:
+#         str: The generated story.
+#     """
+#     logger.info("Generating story")
+#     presence_penalty = AI21PenaltyData(scale=4.9)
+#     frequency_penalty = AI21PenaltyData(scale=4)
+#     llm = AI21(
+#         model="j2-mid",
+#         ai21_api_key=llm_settings.ai21_api_key,
+#         maxTokens=120,
+#         presencePenalty=presence_penalty,
+#         minTokens=80,
+#         frequencyPenalty=frequency_penalty,
+#         temperature=0.5,
+#         topP=0.2,
+#     )
 
-
-def wiki_search(query: str):
-    """
-    Searches for a given query on the Wikipedia API and returns a list of page keys.
-
-    Parameters:
-        query (str): The search query to be used for the Wikipedia API.
-
-    Returns:
-        list: A list of page keys extracted from the response of the Wikipedia API.
-    """
-
-    params = {
-        "action": "query",
-        "format": "json",
-        "prop": "revisions",
-        "rvprop": "content",
-        "rvslots": "main",
-        "titles": query,
-    }
-
-    # Send the API request
-    response = requests.get(
-        WIKI_API_SEARCH_URL.format(query), params=params, timeout=60
-    )
-
-    if response.status_code == 200:
-        # Parse the JSON data
-        data = response.json()
-
-        # Extract the page content from the response
-        pages = data["pages"]
-        return [page["key"].lower() for page in pages]
-
-    else:
-        print("Failed to retrieve page content.")
+#     prompt_template = open_prompt_txt("../prompts/prompt.txt")
+#     final_prompt = PromptTemplate(
+#         input_variables=["documents", "user"],
+#         template=prompt_template,
+#     )
+#     chain = LLMChain(llm=llm, prompt=final_prompt)
+#     question = chain.invoke({"user": user_prompt, "documents": context_documents})
+#     logger.info("Story generated successfully")
+#     return Story(prompt=user_prompt, text=question["text"])
 
 
-def get_page_content(title: str) -> WikiPage:
-    """
-    A function that retrieves the content of a Wikipedia page based on the provided title.
+# def extract_entities(text: str):
+#     """
+#     A function that returns named entity recognition (NER) tokens from the given text.
 
-    Args:
-        title (str): The title of the Wikipedia page to retrieve.
+#     Parameters:
+#     - text (str): The input text for which NER tokens need to be extracted.
 
-    Returns:
-        WikiPage: An instance of WikiPage containing the title and text of the Wikipedia page.
-    """
-    return WikiPage(page_title=title, text=wiki_wiki.page(title=title).text)
-
-
-def chunk_and_save(page: WikiPage):
-    """
-    Splits the text of each WikiPage in the given list into smaller chunks using the RecursiveCharacterTextSplitter.
-
-    Args:
-        pages (List[WikiPage]): A list of WikiPage objects containing the text to be split.
-
-    Returns:
-        List[Redis]: A list of Redis objects created from the split text of each WikiPage.
-    """
-
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=250)
-    page_splits = (
-        WikiPage(page_title=page.page_title, text=text_splitter.split_text(page.text))
-        if page.text != ""
-        else None
-    )
-    if page_splits is None:
-        return False
-    Redis.from_texts(
-        page_splits.text,
-        embeddings,
-        redis_url=redis_url,
-        index_name=page_splits.page_title,
-    )
-    return True
+#     Returns:
+#     - list: A list of NER tokens extracted from the input text.
+#     """
+#     result = ner_model.token_classification(
+#         text=text, model=hf_hub_settings.ner_repo_id
+#     )
+#     return [i["word"].strip() for i in result]
 
 
-def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Document]:
-    """
-    Generates a list of Document objects by invoking the RedisVectorStoreRetriever with the given user prompt and index names.
+# def wiki_search(query: str):
+#     """
+#     Searches for a given query on the Wikipedia API and returns a list of page keys.
 
-    Args:
-        user_prompt (str): The user prompt to be passed to the RedisVectorStoreRetriever.
-        index_names (List[str]): The list of index names to be used by the RedisVectorStoreRetriever.
+#     Parameters:
+#         query (str): The search query to be used for the Wikipedia API.
 
-    Returns:
-        List[Document]: The list of Document objects generated by the RedisVectorStoreRetriever.
-    """
-    return [
-        RedisVectorStoreRetriever(
-            vectorstore=Redis(
-                redis_url=redis_url, embedding=embeddings, index_name=index_name.lower()
-            ),
-            search_kwargs={"k": 5, "distance_threshold": None},
-        ).invoke(user_prompt)
-        for index_name in index_names
-    ]
+#     Returns:
+#         list: A list of page keys extracted from the response of the Wikipedia API.
+#     """
+
+#     params = {
+#         "action": "query",
+#         "format": "json",
+#         "prop": "revisions",
+#         "rvprop": "content",
+#         "rvslots": "main",
+#         "titles": query,
+#     }
+
+#     # Send the API request
+#     response = requests.get(
+#         WIKI_API_SEARCH_URL.format(query), params=params, timeout=60
+#     )
+
+#     if response.status_code == 200:
+#         # Parse the JSON data
+#         data = response.json()
+
+#         # Extract the page content from the response
+#         pages = data["pages"]
+#         return [page["key"].lower() for page in pages]
+
+#     else:
+#         print("Failed to retrieve page content.")
 
 
-def check_existing_redis_index(index_name: str) -> bool:
-    """
-    Checks if an index with the given name exists in Redis.
+# def get_page_content(title: str) -> WikiPage:
+#     """
+#     A function that retrieves the content of a Wikipedia page based on the provided title.
 
-    Args:
-        index_name (str): The name of the index to check.
+#     Args:
+#         title (str): The title of the Wikipedia page to retrieve.
 
-    Returns:
-        bool: True if the index exists, False otherwise.
-    """
-    index = SearchIndex.from_dict(
-        {
-            "index": {"name": index_name, "prefix": "docs", "storage_type": "hash"},
-            "fields": [
-                {
-                    "name": "content_vector",
-                    "type": "vector",
-                    "attrs": {
-                        "dims": 1536,
-                        "algorithm": "FLAT",
-                        "datatype": "FLOAT32",
-                        "distance_metric": "COSINE",
-                    },
-                }
-            ],
-        }
-    )
+#     Returns:
+#         WikiPage: An instance of WikiPage containing the title and text of the Wikipedia page.
+#     """
+#     return WikiPage(page_title=title, text=wiki_wiki.page(title=title).text)
 
-    return index.connect(redis_url=redis_url).exists()
+
+# def chunk_and_save(page: WikiPage):
+#     """
+#     Splits the text of each WikiPage in the given list into smaller chunks using the RecursiveCharacterTextSplitter.
+
+#     Args:
+#         pages (List[WikiPage]): A list of WikiPage objects containing the text to be split.
+
+#     Returns:
+#         List[Redis]: A list of Redis objects created from the split text of each WikiPage.
+#     """
+
+#     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=250)
+#     page_splits = (
+#         WikiPage(page_title=page.page_title, text=text_splitter.split_text(page.text))
+#         if page.text != ""
+#         else None
+#     )
+#     if page_splits is None:
+#         return False
+#     Redis.from_texts(
+#         page_splits.text,
+#         embeddings,
+#         redis_url=redis_url,
+#         index_name=page_splits.page_title,
+#     )
+#     return True
+
+
+# def return_documents(user_prompt: str, *, index_names: List[str]) -> List[Document]:
+#     """
+#     Generates a list of Document objects by invoking the RedisVectorStoreRetriever with the given user prompt and index names.
+
+#     Args:
+#         user_prompt (str): The user prompt to be passed to the RedisVectorStoreRetriever.
+#         index_names (List[str]): The list of index names to be used by the RedisVectorStoreRetriever.
+
+#     Returns:
+#         List[Document]: The list of Document objects generated by the RedisVectorStoreRetriever.
+#     """
+#     return [
+#         RedisVectorStoreRetriever(
+#             vectorstore=Redis(
+#                 redis_url=redis_url, embedding=embeddings, index_name=index_name.lower()
+#             ),
+#             search_kwargs={"k": 5, "distance_threshold": None},
+#         ).invoke(user_prompt)
+#         for index_name in index_names
+#     ]
+
+
+# def check_existing_redis_index(index_name: str) -> bool:
+#     """
+#     Checks if an index with the given name exists in Redis.
+
+#     Args:
+#         index_name (str): The name of the index to check.
+
+#     Returns:
+#         bool: True if the index exists, False otherwise.
+#     """
+#     index = SearchIndex.from_dict(
+#         {
+#             "index": {"name": index_name, "prefix": "docs", "storage_type": "hash"},
+#             "fields": [
+#                 {
+#                     "name": "content_vector",
+#                     "type": "vector",
+#                     "attrs": {
+#                         "dims": 1536,
+#                         "algorithm": "FLAT",
+#                         "datatype": "FLOAT32",
+#                         "distance_metric": "COSINE",
+#                     },
+#                 }
+#             ],
+#         }
+#     )
+
+#     return index.connect(redis_url=redis_url).exists()
 
 
 def main():

@@ -117,7 +117,7 @@ class BaseReader:
 
     def _read_from_url(self):
         try:
-            responce = self.session.get_content()
+            responce = self.session.get_txt()
         except TimeoutError as e:
             raise ServerTimeOutError(location=self.file_path) from e
         return responce

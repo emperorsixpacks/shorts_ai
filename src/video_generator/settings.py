@@ -43,6 +43,10 @@ class RedisSettings(BaseConfig):
     redis_host: str = "localhost"
     redis_port: int = None
 
+    @property
+    def redis_url(self):
+        return f"redis://{self.redis_host}:{self.redis_port}"
+
 
 class HuggingFaceHubSettings(BaseConfig):
     """
@@ -90,10 +94,7 @@ class BucketSettings(BaseConfig):
         bucket_api_key (str): The API key for the AWS S3 bucket.
         bucket_name (str): The name of the AWS S3 bucket.
     """
-   
+
     bucket_secret_key: str = None
     bucket_api_key: str = None
     bucket_name: str = None
-
-
-
