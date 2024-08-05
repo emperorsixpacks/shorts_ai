@@ -14,3 +14,5 @@ activate
 .activate.swp
 *.ass
 *.json
+node_modules/
+package-lock.json

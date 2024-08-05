@@ -4,12 +4,15 @@ Utility functions for common tasks in the project.
 
 from __future__ import annotations
 import os
-from typing import TYPE_CHECKING, Self, List, Dict, Optional
+import time
+from tempfile import NamedTemporaryFile
+from typing import TYPE_CHECKING, Self, List, Dict
 from functools import lru_cache
 
 from dataclasses import dataclass, field
 from enum import StrEnum
 from datetime import datetime
+import requests
 
 from ibm_botocore.exceptions import ClientError
 import ffmpeg
@@ -45,6 +48,7 @@ DEFAULT_WIKIPEDIA_SEARCH_PARAMS = {
 
 
 WIKI_API_SEARCH_URL = "https://en.wikipedia.org/w/rest.php/v1/search/page"
+TTS_MAKER_URL = "https://ttsmp3.com/makemp3_new.php"
 
 
 def return_base_dir():
@@ -160,7 +164,7 @@ class WikiPage:
 
     page_title: str
     wikipidea_client: Wikipedia
-    text: str = field(default=None, init=False)
+    text: str = field(default=None)
 
     def __post_init__(self):
         self.page_title = self.page_title.lower()
@@ -342,6 +346,131 @@ def extract_entities(text: str, ner_model, hf_hub_settings: HuggingFaceHubSettin
         text=text, model=hf_hub_settings.ner_repo_id
     )
     return [i["word"].strip() for i in result]
+
+
+def convert_text_to_audio(
+    client, name: str, text: str, bucket_settings: BucketSettings
+) -> MediaFile | None:
+    """
+    Converts text to audio using the TTSMP3 API.
+
+    Parameters:
+        client (Client): The AWS client.
+        name (str): The name of the audio file.
+        text (Story): The text to be converted to audio.
+
+    Returns:
+        MediaFile | None: The converted audio file if successful, None otherwise.
+    """
+    try:
+        # logger.info("Converting text to audio")
+        media_file = MediaFile(name=name, file_type=MediaFileType.AUDIO)
+        data = {"msg": text, "lang": "Matthew", "source": "ttsmp3"}
+        response = requests.post(TTS_MAKER_URL, data=data, timeout=60)
+        response.raise_for_status()
+        audio_url = response.json().get("URL")
+
+        if not audio_url:
+            # logger.warning("No URL found in TTSMP3 response")
+            return None
+
+        media_file.url = audio_url
+
+        with NamedTemporaryFile(delete=False) as tempfile:
+            download_response = requests.get(audio_url, stream=True, timeout=60)
+            download_response.raise_for_status()
+
+            for chunk in download_response.iter_content(chunk_size=1024):
+                tempfile.write(chunk)
+
+        # logger.info("Uploading audio to S3")
+        upload_success = upload_file_to_s3(
+            client,
+            media_file=media_file,
+            file_location=tempfile.name,
+            bucket_settings=bucket_settings,
+        )
+
+        if not upload_success:
+            # logger.warning("Failed to upload audio to S3")
+            return None
+
+        # logger.info("Audio converted successfully")
+        return media_file.set_duration()
+
+    except requests.RequestException as e:
+        # logger.error(f"HTTP request failed: {e}")
+        return None
+    except Exception as e:
+        # logger.error(f"An unexpected error occurred: {e}")
+        return None
+
+
+def transcribe_audio(
+    client, *, audio: MediaFile, bucket_settings: BucketSettings
+) -> str | None:
+    """
+    Transcribes audio using AWS Transcribe.
+
+    Parameters:
+        client (boto3.client): The AWS Transcribe client.
+        audio (MediaFile): The audio file to be transcribed.
+
+    Returns:
+        str | None: The URI of the transcript if successful, None otherwise.
+    """
+    try:
+        transcription_job_name = audio.name
+        s3_location = audio.get_s3_location(settings=bucket_settings)
+
+        # logger.info(f"Starting transcription job for {transcription_job_name}.")
+        client.start_transcription_job(
+            TranscriptionJobName=transcription_job_name,
+            Media={"MediaFileUri": s3_location},
+            MediaFormat="wav",
+            LanguageCode="en-US",
+        )
+
+        for _ in range(60):
+            job = client.get_transcription_job(
+                TranscriptionJobName=transcription_job_name
+            )
+            job_status = job["TranscriptionJob"]["TranscriptionJobStatus"]
+
+            if job_status in ["COMPLETED", "FAILED"]:
+                # logger.info(f"Job {transcription_job_name} is {job_status}.")
+                if job_status == "COMPLETED":
+                    transcript_uri = job["TranscriptionJob"]["Transcript"][
+                        "TranscriptFileUri"
+                    ]
+                    return transcript_uri
+                break
+            else:
+                pass
+                # logger.info(f"Waiting for {transcription_job_name}. Current status: {job_status}.")
+            time.sleep(10)
+
+    except client.exceptions.BadRequestException as e:
+        # logger.error(f"Bad request: {e}")
+
+        pass
+    except client.exceptions.LimitExceededException as e:
+        # logger.error(f"Limit exceeded: {e}")
+        pass
+    except client.exceptions.InternalFailureException as e:
+        # logger.error(f"Internal failure: {e}")
+        pass
+    except client.exceptions.ConflictException as e:
+        # logger.error(f"Conflict: {e}")
+        pass
+    except client.exceptions.ServiceUnavailableException as e:
+        # logger.error(f"Service unavailable: {e}")
+        pass
+    except Exception as e:
+        # logger.error(f"An unexpected error occurred: {e}")
+        pass
+
+    return None
 
 
 # TODO add interface for both AWS and IBM Cloud

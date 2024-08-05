@@ -182,65 +182,80 @@ def combine_video_and_audio(
     return process
 
 
-def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
-    """
-    Converts text to audio using the TTSMP3 API.
-    Parameters:
-        client (Client): The AWS client.
-        name (str): The name of the audio file.
-        text (Story): The text to be converted to audio.
-    Returns:
-        MediaFile | None: The converted audio file if successful, None otherwise.
-    """
+# def convert_text_to_audio(client, name: str, text: Story) -> MediaFile | None:
+#     """
+#     Converts text to audio using the TTSMP3 API.
 
-    logger.info("Converting text to audio")
-    media_file = MediaFile(name=name, file_type=MediaFileType.AUDIO)
-    data = {"msg": text.text, "lang": "Matthew", "source": "ttsmp3"}
-    audio_url = requests.post(
-        "https://ttsmp3.com/makemp3_new.php", data=data, timeout=60
-    ).json()["URL"]
-    media_file.url = audio_url
-    with NamedTemporaryFile() as tempfile:
-        r = requests.get(audio_url, stream=True, timeout=60)
-        if r.status_code == 200:
-            with open(tempfile.name, "wb") as f:
-                for chunk in r.iter_content(chunk_size=1024):
-                    f.write(chunk)
-        else:
-            logger.warning("Failed to download audio from TTSMP3")
-            return None
-        logger.info("Uploading audio to S3")
-        upload = upload_file_to_s3(
-            client,
-            media_file=media_file,
-            file_location=tempfile.name,
-            bucket_settings=bucket_settings,
-        )
-        if not upload:
-            logger.warning("Failed to upload audio to S3")
-            return None
-    logger.info("Audio converted successfully")
-    return media_file.set_duration()
+#     Parameters:
+#         client (Client): The AWS client.
+#         name (str): The name of the audio file.
+#         text (Story): The text to be converted to audio.
+
+#     Returns:
+#         MediaFile | None: The converted audio file if successful, None otherwise.
+#     """
+#     try:
+#         logger.info("Converting text to audio")
+#         media_file = MediaFile(name=name, file_type=MediaFileType.AUDIO)
+#         data = {"msg": text.text, "lang": "Matthew", "source": "ttsmp3"}
+#         response = requests.post("https://ttsmp3.com/makemp3_new.php", data=data, timeout=60)
+#         response.raise_for_status()
+#         audio_url = response.json().get("URL")
+
+#         if not audio_url:
+#             logger.warning("No URL found in TTSMP3 response")
+#             return None
+
+#         media_file.url = audio_url
+
+#         with NamedTemporaryFile(delete=False) as tempfile:
+#             download_response = requests.get(audio_url, stream=True, timeout=60)
+#             download_response.raise_for_status()
+
+#             for chunk in download_response.iter_content(chunk_size=1024):
+#                 tempfile.write(chunk)
+
+#         logger.info("Uploading audio to S3")
+#         upload_success = upload_file_to_s3(
+#             client,
+#             media_file=media_file,
+#             file_location=tempfile.name,
+#             bucket_settings=bucket_settings,
+#         )
+
+#         if not upload_success:
+#             logger.warning("Failed to upload audio to S3")
+#             return None
+
+#         logger.info("Audio converted successfully")
+#         return media_file.set_duration()
+
+#     except requests.RequestException as e:
+#         logger.error(f"HTTP request failed: {e}")
+#         return None
+#     except Exception as e:
+#         logger.error(f"An unexpected error occurred: {e}")
+#         return None
 
 
-def transcribe_audio(client, *, audio: MediaFile):
-    client.start_transcription_job(
-        TranscriptionJobName=audio.name,
-        Media={"MediaFileUri": audio.get_s3_location(settings=bucket_settings)},
-        MediaFormat="wav",
-        LanguageCode="en-US",
-    )
-    for _ in range(60):
-        job = client.get_transcription_job(TranscriptionJobName=audio.name)
-        job_status = job["TranscriptionJob"]["TranscriptionJobStatus"]
-        if job_status in ["COMPLETED", "FAILED"]:
-            print(f"Job {audio.name} is {job_status}.")
-            if job_status == "COMPLETED":
-                return job["TranscriptionJob"]["Transcript"]["TranscriptFileUri"]
-            break
-        else:
-            print(f"Waiting for {audio.name}. Current status is {job_status}.")
-        time.sleep(10)
+# def transcribe_audio(client, *, audio: MediaFile):
+#     client.start_transcription_job(
+#         TranscriptionJobName=audio.name,
+#         Media={"MediaFileUri": audio.get_s3_location(settings=bucket_settings)},
+#         MediaFormat="wav",
+#         LanguageCode="en-US",
+#     )
+#     for _ in range(60):
+#         job = client.get_transcription_job(TranscriptionJobName=audio.name)
+#         job_status = job["TranscriptionJob"]["TranscriptionJobStatus"]
+#         if job_status in ["COMPLETED", "FAILED"]:
+#             print(f"Job {audio.name} is {job_status}.")
+#             if job_status == "COMPLETED":
+#                 return job["TranscriptionJob"]["Transcript"]["TranscriptFileUri"]
+#             break
+#         else:
+#             print(f"Waiting for {audio.name}. Current status is {job_status}.")
+#         time.sleep(10)
 
 
 # def open_prompt_txt(prompt_txt: str) -> str:
