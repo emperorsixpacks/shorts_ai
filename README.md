@@ -1,6 +1,6 @@
 # Shorts AI
 
-Shorts AI is a project designed to generate short video content using AI. This repository contains the main execution script and supporting files needed to run the AI.
+Shorts AI is a project designed to generate short video content using AI (did tou know videos). This repository contains the main execution script and supporting files needed to run the AI.
 
 ## Features
 
